@@ -50,7 +50,7 @@ async def test_end_to_end_flow(manager: BudgetManager) -> None:
     assert cost == 0.05
 
     # 3. Record spend
-    await manager.record_spend(user_id, cost)
+    await manager.record_spend(user_id, cost, model="gpt-4")
 
     # Verify spend in Redis
     # We can access internal ledger to verify
@@ -70,7 +70,7 @@ async def test_budget_exceeded_flow(manager: BudgetManager) -> None:
     limit = manager.config.daily_user_limit_usd  # 10.0
 
     # Record enough spend to reach limit
-    await manager.record_spend(user_id, limit)
+    await manager.record_spend(user_id, limit, model="gpt-4")
 
     # Verify check fails
     with pytest.raises(BudgetExceededError):
