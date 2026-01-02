@@ -8,9 +8,14 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
+from pathlib import Path
 from coreason_budget.utils.logger import logger
 
-
-def hello_world() -> str:
-    logger.info("Hello World!")
-    return "Hello World!"
+def test_logger_setup():
+    """Test that the logger is configured correctly."""
+    assert logger is not None
+    # Verify that the log file is created
+    log_path = Path("logs/app.log")
+    # We might need to log something to ensure the file is created if it's lazy
+    logger.info("Test log entry")
+    assert log_path.exists()
