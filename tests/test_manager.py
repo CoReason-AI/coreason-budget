@@ -13,8 +13,9 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from coreason_budget import BudgetConfig, BudgetExceededError, BudgetManager
 from fakeredis import aioredis
+
+from coreason_budget import BudgetConfig, BudgetExceededError, BudgetManager
 
 
 @pytest_asyncio.fixture

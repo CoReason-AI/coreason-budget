@@ -13,10 +13,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import pytest_asyncio
-from coreason_budget.ledger import RedisLedger
 from fakeredis import aioredis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import RedisError
+
+from coreason_budget.ledger import RedisLedger
 
 
 @pytest.fixture

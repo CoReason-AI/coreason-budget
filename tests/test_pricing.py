@@ -11,6 +11,7 @@
 from unittest.mock import patch
 
 import pytest
+
 from coreason_budget.pricing import PricingEngine
 
 
