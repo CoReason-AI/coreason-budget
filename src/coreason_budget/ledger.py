@@ -38,7 +38,7 @@ class RedisLedger:
     async def close(self) -> None:
         """Close the Redis connection."""
         if self._redis:
-            await self._redis.close()
+            await self._redis.aclose()
             self._redis = None
             logger.info("Closed Redis connection")
 

@@ -9,10 +9,10 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 import shutil
-
-# We need to reload the module to test the initialization logic
 import sys
 from pathlib import Path
+
+from loguru import logger
 
 
 def test_logger_dir_creation() -> None:
@@ -20,7 +20,10 @@ def test_logger_dir_creation() -> None:
     # This is tricky because the module code runs on import.
     # We need to simulate the absence of the logs directory.
 
-    # 1. Remove "logs" dir if exists (safe in sandbox?)
+    # 1. Release file handles
+    logger.remove()
+
+    # 2. Remove "logs" dir if exists (safe in sandbox?)
     log_path = Path("logs")
     if log_path.exists():
         shutil.rmtree(log_path)
