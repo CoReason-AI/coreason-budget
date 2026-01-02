@@ -78,20 +78,38 @@ class BudgetGuard:
                 logger.warning("Budget exceeded for {}: Used ${} >= Limit ${}", scope, used, limit)
                 raise BudgetExceededError(f"{scope} daily limit of ${limit} reached.")
 
-    async def record_spend(self, user_id: str, amount: float, project_id: Optional[str] = None) -> None:
+            # Log successful check for this scope (User scope is most relevant to log if we want per-user tracking)
+            if "User" in scope:
+                logger.info("Budget Check: {} | Used: ${} / Limit: ${}", scope, used, limit)
+
+    async def record_spend(
+        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
+    ) -> None:
         """
         Record spend against all applicable scopes.
+        Args:
+            user_id: The user ID.
+            amount: The amount to record.
+            project_id: Optional project ID.
+            model: Optional model name (for metrics).
         """
         keys_info = self._get_keys_and_limits(user_id, project_id)
         ttl = self._get_ttl_seconds()
 
         # We need to increment all keys.
-        # Ideally this should be a transaction or pipeline, but RedisLedger.increment is atomic per key.
-        # Since these are independent counters (Global, Project, User), strict transactional consistency between them
-        # (all or nothing) is less critical than just getting them counted.
-        # But if one fails and others succeed, we drift.
-        # Ideally, Ledger should support batch increment?
-        # For now, we iterate. "Eventual consistency" is acceptable for budget tracking if rare errors occur.
-
         for key, _, _ in keys_info:
             await self.ledger.increment(key, amount, ttl=ttl)
+
+        # Log metric event
+        # Format: finops.spend.total (Counter, tagged by Model and Project)
+        # We simulate a metric emission via structured logging
+        project_tag = project_id if project_id else "none"
+        model_tag = model if model else "unknown"
+
+        logger.info(
+            "METRIC: finops.spend.total | Amount: ${} | Tags: model={}, project={}, user={}",
+            amount,
+            model_tag,
+            project_tag,
+            user_id,
+        )
