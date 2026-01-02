@@ -78,6 +78,26 @@ async def test_check_availability_global_limit(guard: BudgetGuard, mock_ledger: 
 
 
 @pytest.mark.asyncio
+async def test_check_availability_with_estimation(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
+    """Test check availability with estimated cost."""
+
+    # Setup: User Limit=10.0. Current Usage=8.0.
+    async def get_usage_side_effect(key: str) -> float:
+        if "user" in key:
+            return 8.0
+        return 0.0
+
+    mock_ledger.get_usage.side_effect = get_usage_side_effect
+
+    # 1. Check with cost 1.0 -> 8.0 + 1.0 = 9.0 < 10.0 -> OK
+    await guard.check_availability("user1", estimated_cost=1.0)
+
+    # 2. Check with cost 3.0 -> 8.0 + 3.0 = 11.0 > 10.0 -> Fail
+    with pytest.raises(BudgetExceededError, match="User user1 daily limit"):
+        await guard.check_availability("user1", estimated_cost=3.0)
+
+
+@pytest.mark.asyncio
 async def test_record_spend(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
     """Test recording spend."""
     await guard.record_spend("user1", 0.5, "proj1")
