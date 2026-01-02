@@ -8,31 +8,11 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
-from typing import AsyncGenerator
 from unittest.mock import patch
 
 import pytest
-import pytest_asyncio
-from fakeredis import aioredis
 
-from coreason_budget import BudgetConfig, BudgetExceededError, BudgetManager
-
-
-@pytest_asyncio.fixture
-async def manager() -> AsyncGenerator[BudgetManager, None]:
-    config = BudgetConfig(redis_url="redis://localhost:6379", daily_user_limit_usd=10.0)
-    mgr = BudgetManager(config)
-
-    # Mock connection in ledger to use fakeredis
-    # Since BudgetManager initializes RedisLedger internally, we need to patch it
-    # OR we can access mgr.ledger and patch its internal _redis if we connect first?
-    # Better: Patch RedisLedger.connect or patch from_url during the test.
-
-    # Let's manually inject a fake redis client into the ledger
-    mgr.ledger._redis = aioredis.FakeRedis(decode_responses=True)
-
-    yield mgr
-    await mgr.close()
+from coreason_budget import BudgetExceededError, BudgetManager
 
 
 @pytest.mark.asyncio
@@ -51,13 +31,6 @@ async def test_end_to_end_flow(manager: BudgetManager) -> None:
 
     # 3. Record spend
     await manager.record_spend(user_id, cost, model="gpt-4")
-
-    # Verify spend in Redis
-    # We can access internal ledger to verify
-    # Key construction: spend:v1:user:{user_id}:{date}
-    # We can use the guard to get the key? No, internal method.
-    # Just check that it's > 0
-    # Actually, let's just do another check.
 
     # 4. Check availability again (should pass)
     await manager.check_availability(user_id)
