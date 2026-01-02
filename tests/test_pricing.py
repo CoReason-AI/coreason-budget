@@ -45,6 +45,7 @@ def test_calculate_with_override() -> None:
     # So we will import config classes after we define them?
     # Or just mock the config object to have the attribute.
     from unittest.mock import MagicMock
+
     from coreason_budget.config import CoreasonBudgetConfig
 
     # We can't use the real config yet because it doesn't have the field.

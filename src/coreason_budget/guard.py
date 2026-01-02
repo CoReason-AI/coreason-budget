@@ -86,9 +86,7 @@ class BudgetGuard:
 
             # Log successful check for this scope (User scope is most relevant to log if we want per-user tracking)
             if "User" in scope:
-                logger.info(
-                    "Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit
-                )
+                logger.info("Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit)
 
     async def record_spend(
         self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None

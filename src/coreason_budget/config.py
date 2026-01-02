@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ModelPrice(BaseModel):
+class ModelPrice(BaseModel):  # type: ignore[misc]
     """Cost configuration for a model."""
 
     input_cost_per_token: float = Field(description="Cost per input token in USD")

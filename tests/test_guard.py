@@ -80,6 +80,7 @@ async def test_check_availability_global_limit(guard: BudgetGuard, mock_ledger: 
 @pytest.mark.asyncio
 async def test_check_availability_with_estimation(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
     """Test check availability with estimated cost."""
+
     # Setup: User Limit=10.0. Current Usage=8.0.
     async def get_usage_side_effect(key: str) -> float:
         if "user" in key:
