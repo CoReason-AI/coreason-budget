@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "coreason-budget"
+version = "0.1.0"
+description = "Financial discipline and budget enforcement for CoReason platform."
+requires-python = ">=3.10"
+dependencies = [
+    "redis>=5.0.0",
+    "litellm>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coreason_budget"]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "fakeredis",
+]
