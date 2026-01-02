@@ -78,6 +78,20 @@ async def test_budget_exceeded_flow(manager: BudgetManager) -> None:
 
 
 @pytest.mark.asyncio
+async def test_check_availability_estimation_pass_through(manager: BudgetManager) -> None:
+    """Test that estimated_cost is passed through to the guard."""
+    user_id = "user_pass_through"
+    # Limit 10.0
+
+    # 1. Spend 8.0
+    await manager.record_spend(user_id, 8.0)
+
+    # 2. Check with 3.0 -> should fail (11.0 > 10.0)
+    with pytest.raises(BudgetExceededError):
+        await manager.check_availability(user_id, estimated_cost=3.0)
+
+
+@pytest.mark.asyncio
 async def test_pricing_integration(manager: BudgetManager) -> None:
     """Test pricing engine access."""
     assert manager.pricing is not None

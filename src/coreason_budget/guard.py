@@ -65,7 +65,9 @@ class BudgetGuard:
 
         return items
 
-    async def check_availability(self, user_id: str, project_id: Optional[str] = None) -> None:
+    async def check_availability(
+        self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0
+    ) -> None:
         """
         Check if budget is available.
         Raises BudgetExceededError if any limit is reached.
@@ -74,13 +76,17 @@ class BudgetGuard:
 
         for key, limit, scope in checks:
             used = await self.ledger.get_usage(key)
-            if used >= limit:
-                logger.warning("Budget exceeded for {}: Used ${} >= Limit ${}", scope, used, limit)
+            # Fail if budget is already exhausted (used >= limit)
+            # OR if this specific request would exceed the limit (used + est > limit)
+            if used >= limit or (estimated_cost > 0 and used + estimated_cost > limit):
+                logger.warning(
+                    "Budget exceeded for {}: Used ${} + Est ${} > Limit ${}", scope, used, estimated_cost, limit
+                )
                 raise BudgetExceededError(f"{scope} daily limit of ${limit} reached.")
 
             # Log successful check for this scope (User scope is most relevant to log if we want per-user tracking)
             if "User" in scope:
-                logger.info("Budget Check: {} | Used: ${} / Limit: ${}", scope, used, limit)
+                logger.info("Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit)
 
     async def record_spend(
         self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None

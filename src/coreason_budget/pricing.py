@@ -8,13 +8,19 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
+from typing import Optional
+
 import litellm
 
+from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.utils.logger import logger
 
 
 class PricingEngine:
     """Calculates cost of LLM transactions using liteLLM."""
+
+    def __init__(self, config: Optional[CoreasonBudgetConfig] = None) -> None:
+        self.config = config
 
     def calculate(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """
@@ -28,6 +34,13 @@ class PricingEngine:
         Returns:
             Cost in USD.
         """
+        # Check for overrides
+        if self.config and model in self.config.model_price_overrides:
+            price = self.config.model_price_overrides[model]
+            cost = (input_tokens * price.input_cost_per_token) + (output_tokens * price.output_cost_per_token)
+            logger.info("Using override pricing for model {}: ${}", model, cost)
+            return cost
+
         try:
             # completion_cost returns float
             cost = litellm.completion_cost(model=model, prompt_tokens=input_tokens, completion_tokens=output_tokens)
@@ -35,8 +48,6 @@ class PricingEngine:
         except Exception as e:
             # Fallback or error?
             # Prompt says "Fallback: Allow strictly typed overrides via configuration".
-            # But currently we don't have overrides in config.
-            # For now, we log and re-raise or return 0?
             # "Rejects requests (Circuit Breaking) when limits are exceeded."
             # If we can't calculate cost, we probably shouldn't charge 0.
             # But cost calculation happens Post-Flight.
