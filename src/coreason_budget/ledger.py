@@ -88,6 +88,7 @@ class RedisLedger:
             -- Ideally the caller provides the remaining seconds to midnight.
             -- If the key already exists, its TTL is ticking.
             -- So we only set EXPIRE if TTL is -1 (no expiry) or if the key was just created.
+            -- This ensures we strictly adhere to the daily limit window (reset at UTC midnight).
             if ttl == -1 then
                 redis.call("EXPIRE", KEYS[1], ARGV[2])
             end

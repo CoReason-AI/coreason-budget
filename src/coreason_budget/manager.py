@@ -25,7 +25,7 @@ class BudgetManager:
     def __init__(self, config: CoreasonBudgetConfig) -> None:
         self.config = config
         self.ledger = RedisLedger(config.redis_url)
-        self.pricing = PricingEngine()
+        self.pricing = PricingEngine(config)
         self.guard = BudgetGuard(config, self.ledger)
 
     async def check_availability(self, user_id: str, project_id: Optional[str] = None) -> None:

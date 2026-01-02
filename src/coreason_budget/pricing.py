@@ -10,11 +10,21 @@
 
 import litellm
 
+from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.utils.logger import logger
 
 
 class PricingEngine:
     """Calculates cost of LLM transactions using liteLLM."""
+
+    def __init__(self, config: CoreasonBudgetConfig = None) -> None:
+        """
+        Initialize PricingEngine.
+
+        Args:
+            config: Optional configuration object. If provided, allows using custom model prices.
+        """
+        self.config = config or CoreasonBudgetConfig()
 
     def calculate(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """
@@ -28,19 +38,18 @@ class PricingEngine:
         Returns:
             Cost in USD.
         """
+        # Check for custom overrides
+        if self.config.custom_model_prices and model in self.config.custom_model_prices:
+            prices = self.config.custom_model_prices[model]
+            input_cost = prices.get("input_cost_per_token", 0.0)
+            output_cost = prices.get("output_cost_per_token", 0.0)
+            cost = (input_tokens * input_cost) + (output_tokens * output_cost)
+            return cost
+
         try:
             # completion_cost returns float
             cost = litellm.completion_cost(model=model, prompt_tokens=input_tokens, completion_tokens=output_tokens)
             return float(cost)
         except Exception as e:
-            # Fallback or error?
-            # Prompt says "Fallback: Allow strictly typed overrides via configuration".
-            # But currently we don't have overrides in config.
-            # For now, we log and re-raise or return 0?
-            # "Rejects requests (Circuit Breaking) when limits are exceeded."
-            # If we can't calculate cost, we probably shouldn't charge 0.
-            # But cost calculation happens Post-Flight.
-            # If we fail to calculate cost, we fail to track spend.
             logger.error("Failed to calculate cost for model {}: {}", model, e)
-            # For now, let's propagate the error so the caller knows something went wrong.
             raise
