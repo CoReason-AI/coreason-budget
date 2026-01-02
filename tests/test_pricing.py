@@ -8,11 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 from coreason_budget.pricing import PricingEngine
 
-def test_calculate_cost_success():
+
+def test_calculate_cost_success() -> None:
     """Test successful cost calculation."""
     engine = PricingEngine()
 
@@ -21,13 +23,10 @@ def test_calculate_cost_success():
 
         cost = engine.calculate("gpt-4", 100, 200)
         assert cost == 0.03
-        mock_cost.assert_called_once_with(
-            model="gpt-4",
-            prompt_tokens=100,
-            completion_tokens=200
-        )
+        mock_cost.assert_called_once_with(model="gpt-4", prompt_tokens=100, completion_tokens=200)
 
-def test_calculate_cost_failure():
+
+def test_calculate_cost_failure() -> None:
     """Test failure in cost calculation."""
     engine = PricingEngine()
 

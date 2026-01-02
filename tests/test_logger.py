@@ -9,9 +9,11 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 from pathlib import Path
+
 from coreason_budget.utils.logger import logger
 
-def test_logger_setup():
+
+def test_logger_setup() -> None:
     """Test that the logger is configured correctly."""
     assert logger is not None
     # Verify that the log file is created

@@ -9,19 +9,22 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 from typing import Optional
+
 from redis.asyncio import Redis, from_url
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import RedisError
 
 from coreason_budget.utils.logger import logger
+
 
 class RedisLedger:
     """Manages Redis connections and atomic operations for budget tracking."""
 
-    def __init__(self, redis_url: str):
+    def __init__(self, redis_url: str) -> None:
         self.redis_url = redis_url
         self._redis: Optional[Redis] = None
 
-    async def connect(self):
+    async def connect(self) -> None:
         """Establish connection to Redis."""
         if self._redis is None:
             try:
@@ -32,7 +35,7 @@ class RedisLedger:
                 logger.error("Failed to connect to Redis: {}", e)
                 raise RedisConnectionError(f"Could not connect to Redis: {e}") from e
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the Redis connection."""
         if self._redis:
             await self._redis.close()
@@ -95,7 +98,7 @@ class RedisLedger:
         try:
             # Redis Lua arguments are strings
             ttl_arg = str(ttl) if ttl is not None else "nil"
-            result = await self._redis.eval(script, 1, key, str(amount), ttl_arg) # type: ignore
+            result = await self._redis.eval(script, 1, key, str(amount), ttl_arg)
             return float(result)
         except RedisError as e:
             logger.error("Redis INCRBYFLOAT error for key {}: {}", key, e)

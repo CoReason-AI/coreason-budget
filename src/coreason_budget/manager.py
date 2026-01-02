@@ -9,10 +9,12 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 from typing import Optional
+
 from coreason_budget.config import CoreasonBudgetConfig
+from coreason_budget.guard import BudgetGuard
 from coreason_budget.ledger import RedisLedger
 from coreason_budget.pricing import PricingEngine
-from coreason_budget.guard import BudgetGuard
+
 
 class BudgetManager:
     """
@@ -20,25 +22,25 @@ class BudgetManager:
     Orchestrates BudgetGuard, RedisLedger, and PricingEngine.
     """
 
-    def __init__(self, config: CoreasonBudgetConfig):
+    def __init__(self, config: CoreasonBudgetConfig) -> None:
         self.config = config
         self.ledger = RedisLedger(config.redis_url)
         self.pricing = PricingEngine()
         self.guard = BudgetGuard(config, self.ledger)
 
-    async def check_availability(self, user_id: str, project_id: Optional[str] = None):
+    async def check_availability(self, user_id: str, project_id: Optional[str] = None) -> None:
         """
         Pre-flight check: Verify if budget allows the request.
         Raises BudgetExceededError if limit reached.
         """
         await self.guard.check_availability(user_id, project_id)
 
-    async def record_spend(self, user_id: str, amount: float, project_id: Optional[str] = None):
+    async def record_spend(self, user_id: str, amount: float, project_id: Optional[str] = None) -> None:
         """
         Post-flight charge: Record the actual spend.
         """
         await self.guard.record_spend(user_id, amount, project_id)
 
-    async def close(self):
+    async def close(self) -> None:
         """Cleanup resources (Redis connection)."""
         await self.ledger.close()

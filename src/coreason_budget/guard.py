@@ -9,19 +9,23 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 import datetime
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
+
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.ledger import RedisLedger
 from coreason_budget.utils.logger import logger
 
+
 class BudgetExceededError(Exception):
     """Raised when a budget limit is exceeded."""
+
     pass
+
 
 class BudgetGuard:
     """Enforces budget limits."""
 
-    def __init__(self, config: CoreasonBudgetConfig, ledger: RedisLedger):
+    def __init__(self, config: CoreasonBudgetConfig, ledger: RedisLedger) -> None:
         self.config = config
         self.ledger = ledger
 
@@ -34,10 +38,7 @@ class BudgetGuard:
         now = datetime.datetime.now(datetime.timezone.utc)
         tomorrow = now + datetime.timedelta(days=1)
         midnight = datetime.datetime(
-            year=tomorrow.year,
-            month=tomorrow.month,
-            day=tomorrow.day,
-            tzinfo=datetime.timezone.utc
+            year=tomorrow.year, month=tomorrow.month, day=tomorrow.day, tzinfo=datetime.timezone.utc
         )
         return int((midnight - now).total_seconds())
 
@@ -64,7 +65,7 @@ class BudgetGuard:
 
         return items
 
-    async def check_availability(self, user_id: str, project_id: Optional[str] = None):
+    async def check_availability(self, user_id: str, project_id: Optional[str] = None) -> None:
         """
         Check if budget is available.
         Raises BudgetExceededError if any limit is reached.
@@ -77,7 +78,7 @@ class BudgetGuard:
                 logger.warning("Budget exceeded for {}: Used ${} >= Limit ${}", scope, used, limit)
                 raise BudgetExceededError(f"{scope} daily limit of ${limit} reached.")
 
-    async def record_spend(self, user_id: str, amount: float, project_id: Optional[str] = None):
+    async def record_spend(self, user_id: str, amount: float, project_id: Optional[str] = None) -> None:
         """
         Record spend against all applicable scopes.
         """

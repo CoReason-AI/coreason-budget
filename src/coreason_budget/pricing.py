@@ -9,7 +9,9 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 import litellm
+
 from coreason_budget.utils.logger import logger
+
 
 class PricingEngine:
     """Calculates cost of LLM transactions using liteLLM."""
@@ -28,11 +30,7 @@ class PricingEngine:
         """
         try:
             # completion_cost returns float
-            cost = litellm.completion_cost(
-                model=model,
-                prompt_tokens=input_tokens,
-                completion_tokens=output_tokens
-            )
+            cost = litellm.completion_cost(model=model, prompt_tokens=input_tokens, completion_tokens=output_tokens)
             return float(cost)
         except Exception as e:
             # Fallback or error?

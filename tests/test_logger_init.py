@@ -9,14 +9,13 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 import shutil
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 # We need to reload the module to test the initialization logic
 import sys
-import importlib
+from pathlib import Path
 
-def test_logger_dir_creation():
+
+def test_logger_dir_creation() -> None:
     """Test that logs directory is created if it doesn't exist."""
     # This is tricky because the module code runs on import.
     # We need to simulate the absence of the logs directory.
@@ -32,7 +31,7 @@ def test_logger_dir_creation():
     if "coreason_budget.utils.logger" in sys.modules:
         del sys.modules["coreason_budget.utils.logger"]
 
-    import coreason_budget.utils.logger
+    import coreason_budget.utils.logger  # noqa: F401
 
     assert log_path.exists()
     assert log_path.is_dir()

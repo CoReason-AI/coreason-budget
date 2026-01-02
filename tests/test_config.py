@@ -9,10 +9,11 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 import os
+
 from coreason_budget.config import CoreasonBudgetConfig
 
 
-def test_config_defaults():
+def test_config_defaults() -> None:
     """Test default configuration values."""
     config = CoreasonBudgetConfig()
     assert config.redis_url == "redis://localhost:6379"
@@ -21,7 +22,7 @@ def test_config_defaults():
     assert config.daily_global_limit_usd == 5000.0
 
 
-def test_config_env_vars():
+def test_config_env_vars() -> None:
     """Test configuration override via environment variables."""
     os.environ["COREASON_BUDGET_REDIS_URL"] = "redis://custom:6379"
     os.environ["COREASON_BUDGET_DAILY_USER_LIMIT_USD"] = "50.0"

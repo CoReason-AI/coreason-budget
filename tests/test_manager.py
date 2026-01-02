@@ -8,15 +8,17 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
+from typing import AsyncGenerator
+from unittest.mock import patch
+
 import pytest
 import pytest_asyncio
+from coreason_budget import BudgetConfig, BudgetExceededError, BudgetManager
 from fakeredis import aioredis
-from unittest.mock import patch, MagicMock
 
-from coreason_budget import BudgetManager, BudgetConfig, BudgetExceededError
 
 @pytest_asyncio.fixture
-async def manager():
+async def manager() -> AsyncGenerator[BudgetManager, None]:
     config = BudgetConfig(redis_url="redis://localhost:6379", daily_user_limit_usd=10.0)
     mgr = BudgetManager(config)
 
@@ -31,8 +33,9 @@ async def manager():
     yield mgr
     await mgr.close()
 
+
 @pytest.mark.asyncio
-async def test_end_to_end_flow(manager):
+async def test_end_to_end_flow(manager: BudgetManager) -> None:
     """Test the complete check -> run -> charge flow."""
     user_id = "user_e2e"
 
@@ -58,11 +61,12 @@ async def test_end_to_end_flow(manager):
     # 4. Check availability again (should pass)
     await manager.check_availability(user_id)
 
+
 @pytest.mark.asyncio
-async def test_budget_exceeded_flow(manager):
+async def test_budget_exceeded_flow(manager: BudgetManager) -> None:
     """Test flow where budget is exceeded."""
     user_id = "user_broke"
-    limit = manager.config.daily_user_limit_usd # 10.0
+    limit = manager.config.daily_user_limit_usd  # 10.0
 
     # Record enough spend to reach limit
     await manager.record_spend(user_id, limit)
@@ -71,8 +75,9 @@ async def test_budget_exceeded_flow(manager):
     with pytest.raises(BudgetExceededError):
         await manager.check_availability(user_id)
 
+
 @pytest.mark.asyncio
-async def test_pricing_integration(manager):
+async def test_pricing_integration(manager: BudgetManager) -> None:
     """Test pricing engine access."""
     assert manager.pricing is not None
     # We mocked litellm in unit tests, here we might want to check it works or mock again.

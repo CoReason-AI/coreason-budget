@@ -14,8 +14,8 @@ This package provides financial guardrails and budget enforcement for LLM usage.
 """
 
 from coreason_budget.config import CoreasonBudgetConfig
-from coreason_budget.manager import BudgetManager
 from coreason_budget.guard import BudgetExceededError
+from coreason_budget.manager import BudgetManager
 
 # Alias for convenience/compatibility with intended usage
 BudgetConfig = CoreasonBudgetConfig
