@@ -8,8 +8,17 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
-from pydantic import Field
+from typing import Dict
+
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ModelPrice(BaseModel):
+    """Cost configuration for a model."""
+
+    input_cost_per_token: float = Field(description="Cost per input token in USD")
+    output_cost_per_token: float = Field(description="Cost per output token in USD")
 
 
 class CoreasonBudgetConfig(BaseSettings):  # type: ignore[misc]
@@ -21,3 +30,7 @@ class CoreasonBudgetConfig(BaseSettings):  # type: ignore[misc]
     daily_user_limit_usd: float = Field(default=10.0, description="Default daily spend limit per user in USD")
     daily_project_limit_usd: float = Field(default=500.0, description="Default daily spend limit per project in USD")
     daily_global_limit_usd: float = Field(default=5000.0, description="Global hard limit for daily spend in USD")
+
+    model_price_overrides: Dict[str, ModelPrice] = Field(
+        default_factory=dict, description="Custom pricing overrides by model name"
+    )
