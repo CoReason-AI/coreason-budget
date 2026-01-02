@@ -10,7 +10,7 @@
 
 from typing import Dict
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,10 +24,16 @@ class ModelPrice(BaseModel):  # type: ignore[misc]
 class CoreasonBudgetConfig(BaseSettings):  # type: ignore[misc]
     """Configuration for Coreason Budget."""
 
-    model_config = SettingsConfigDict(env_prefix="COREASON_BUDGET_", env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_prefix="COREASON_BUDGET_", env_file=".env", env_file_encoding="utf-8", populate_by_name=True
+    )
 
     redis_url: str = Field(default="redis://localhost:6379", description="Redis connection URL")
-    daily_user_limit_usd: float = Field(default=10.0, description="Default daily spend limit per user in USD")
+    daily_user_limit_usd: float = Field(
+        default=10.0,
+        description="Default daily spend limit per user in USD",
+        validation_alias=AliasChoices("daily_user_limit_usd", "daily_limit_usd"),
+    )
     daily_project_limit_usd: float = Field(default=500.0, description="Default daily spend limit per project in USD")
     daily_global_limit_usd: float = Field(default=5000.0, description="Global hard limit for daily spend in USD")
 
