@@ -35,11 +35,13 @@ class BudgetManager:
         """
         await self.guard.check_availability(user_id, project_id)
 
-    async def record_spend(self, user_id: str, amount: float, project_id: Optional[str] = None) -> None:
+    async def record_spend(
+        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
+    ) -> None:
         """
         Post-flight charge: Record the actual spend.
         """
-        await self.guard.record_spend(user_id, amount, project_id)
+        await self.guard.record_spend(user_id, amount, project_id, model=model)
 
     async def close(self) -> None:
         """Cleanup resources (Redis connection)."""

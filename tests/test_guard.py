@@ -94,6 +94,13 @@ async def test_record_spend(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
     assert kwargs["ttl"] > 0
 
 
+@pytest.mark.asyncio
+async def test_record_spend_with_model(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
+    """Test recording spend with model name."""
+    await guard.record_spend("user1", 0.5, "proj1", model="gpt-4")
+    assert mock_ledger.increment.call_count == 3
+
+
 def test_get_keys_and_limits(guard: BudgetGuard) -> None:
     """Test key generation logic."""
     # Mock date for stable keys? Or just check format.
