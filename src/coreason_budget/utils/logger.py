@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
+import os
 import sys
 from pathlib import Path
 
@@ -30,14 +31,17 @@ logger.add(
     ),
 )
 
+# Allow overriding log path via environment variable (useful for testing)
+log_file_path = os.getenv("COREASON_BUDGET_LOG_PATH", "logs/app.log")
+log_path = Path(log_file_path).parent
+
 # Ensure logs directory exists
-log_path = Path("logs")
 if not log_path.exists():
     log_path.mkdir(parents=True, exist_ok=True)
 
 # Sink 2: File (JSON, Rotation, Retention)
 logger.add(
-    "logs/app.log",
+    log_file_path,
     rotation="500 MB",
     retention="10 days",
     serialize=True,
