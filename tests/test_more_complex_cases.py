@@ -8,6 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
+import os
+import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -156,26 +158,28 @@ async def test_pricing_re_raise_error(manager: BudgetManager) -> None:
 # Logger Init
 def test_logger_mkdir() -> None:
     """Test that logger creates directory if missing."""
-    # This is tricky as we need to reload the module or run in subprocess.
-    # Subprocess is cleaner.
     import subprocess
     import sys
 
-    cmd = """
+    # Use a unique temp dir for this test to avoid collision with parent process
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = os.path.join(tmpdir, "test_logs", "app.log")
+
+        cmd = f"""
 import sys
-import shutil
+import os
 from pathlib import Path
 
-# Delete logs dir if exists
-p = Path("logs")
-if p.exists():
-    shutil.rmtree(p)
+# Set env var for log path
+os.environ["COREASON_BUDGET_LOG_PATH"] = r"{log_file}"
 
+# Ensure parent dir does NOT exist
+p = Path(r"{log_file}").parent
 assert not p.exists()
 
 # Import logger should trigger creation
 from coreason_budget.utils import logger
 assert p.exists()
 """
-    result = subprocess.run([sys.executable, "-c", cmd], capture_output=True)
-    assert result.returncode == 0, f"Subprocess failed: {result.stderr.decode()}"
+        result = subprocess.run([sys.executable, "-c", cmd], capture_output=True)
+        assert result.returncode == 0, f"Subprocess failed: {result.stderr.decode()}"
