@@ -62,7 +62,7 @@ async def test_intended_usage_example() -> None:
         )
 
         # Atomic increment
-        await budget.record_spend(user_id, cost)
+        await budget.record_spend(user_id, cost, project_id="proj_1", model="gpt-4")
         # print(f"Transaction Cost: ${cost}")
 
     # Verification: Check if spend was recorded

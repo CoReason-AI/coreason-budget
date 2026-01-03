@@ -88,16 +88,14 @@ class BudgetGuard:
             if "User" in scope:
                 logger.info("Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit)
 
-    async def record_spend(
-        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
-    ) -> None:
+    async def record_spend(self, user_id: str, amount: float, project_id: str, model: str) -> None:
         """
         Record spend against all applicable scopes.
         Args:
             user_id: The user ID.
             amount: The amount to record.
-            project_id: Optional project ID.
-            model: Optional model name (for metrics).
+            project_id: Project identifier.
+            model: Model name (for metrics).
         """
         keys_info = self._get_keys_and_limits(user_id, project_id)
         ttl = self._get_ttl_seconds()
@@ -109,13 +107,10 @@ class BudgetGuard:
         # Log metric event
         # Format: finops.spend.total (Counter, tagged by Model and Project)
         # We simulate a metric emission via structured logging
-        project_tag = project_id if project_id else "none"
-        model_tag = model if model else "unknown"
-
         logger.info(
             "METRIC: finops.spend.total | Amount: ${} | Tags: model={}, project={}, user={}",
             amount,
-            model_tag,
-            project_tag,
+            model,
+            project_id,
             user_id,
         )

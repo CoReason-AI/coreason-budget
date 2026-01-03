@@ -100,7 +100,7 @@ async def test_check_availability_with_estimation(guard: BudgetGuard, mock_ledge
 @pytest.mark.asyncio
 async def test_record_spend(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
     """Test recording spend."""
-    await guard.record_spend("user1", 0.5, "proj1")
+    await guard.record_spend("user1", 0.5, "proj1", "gpt-4")
 
     # Should increment 3 times (Global, Project, User)
     assert mock_ledger.increment.call_count == 3
@@ -112,13 +112,6 @@ async def test_record_spend(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
     assert "ttl" in kwargs
     assert isinstance(kwargs["ttl"], int)
     assert kwargs["ttl"] > 0
-
-
-@pytest.mark.asyncio
-async def test_record_spend_with_model(guard: BudgetGuard, mock_ledger: MagicMock) -> None:
-    """Test recording spend with model name."""
-    await guard.record_spend("user1", 0.5, "proj1", model="gpt-4")
-    assert mock_ledger.increment.call_count == 3
 
 
 def test_get_keys_and_limits(guard: BudgetGuard) -> None:
