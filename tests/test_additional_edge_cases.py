@@ -132,7 +132,8 @@ async def test_empty_user_id() -> None:
 
     mgr.ledger._redis = FakeRedis(decode_responses=True)
 
-    await mgr.record_spend("", 1.0, project_id="proj_empty", model="gpt-4")
+    with pytest.raises(ValueError, match="user_id must be a non-empty string"):
+        await mgr.record_spend("", 1.0, project_id="proj_empty", model="gpt-4")
     await mgr.close()
 
 
