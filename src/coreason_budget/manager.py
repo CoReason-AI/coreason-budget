@@ -34,6 +34,11 @@ class BudgetManager:
         """
         Pre-flight check: Verify if budget allows the request.
         Raises BudgetExceededError if limit reached.
+
+        Args:
+            user_id: The unique identifier for the user.
+            project_id: Optional project identifier. Required for checking project-level quotas.
+            estimated_cost: Optional estimated cost of the request.
         """
         await self.guard.check_availability(user_id, project_id, estimated_cost=estimated_cost)
 
@@ -42,6 +47,12 @@ class BudgetManager:
     ) -> None:
         """
         Post-flight charge: Record the actual spend.
+
+        Args:
+            user_id: The unique identifier for the user.
+            amount: The actual cost in USD to record.
+            project_id: Optional project identifier. Strongly recommended to ensure project quotas are updated.
+            model: Optional model name. Strongly recommended for granular metric tagging (finops.spend.total).
         """
         await self.guard.record_spend(user_id, amount, project_id, model=model)
 
