@@ -42,17 +42,15 @@ class BudgetManager:
         """
         await self.guard.check_availability(user_id, project_id, estimated_cost=estimated_cost)
 
-    async def record_spend(
-        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
-    ) -> None:
+    async def record_spend(self, user_id: str, amount: float, project_id: str, model: str) -> None:
         """
         Post-flight charge: Record the actual spend.
 
         Args:
             user_id: The unique identifier for the user.
             amount: The actual cost in USD to record.
-            project_id: Optional project identifier. Strongly recommended to ensure project quotas are updated.
-            model: Optional model name. Strongly recommended for granular metric tagging (finops.spend.total).
+            project_id: Project identifier.
+            model: Model name.
         """
         await self.guard.record_spend(user_id, amount, project_id, model=model)
 
