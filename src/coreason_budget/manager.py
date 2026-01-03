@@ -46,24 +46,26 @@ class BudgetManager:
 
         await self.guard.check_availability(user_id, project_id, estimated_cost=estimated_cost)
 
-    async def record_spend(self, user_id: str, amount: float, project_id: str, model: str) -> None:
+    async def record_spend(
+        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
+    ) -> None:
         """
         Post-flight charge: Record the actual spend.
 
         Args:
             user_id: The unique identifier for the user.
             amount: The actual cost in USD to record.
-            project_id: Project identifier.
-            model: Model name.
+            project_id: Optional project identifier.
+            model: Optional model name.
         """
         if not user_id or not user_id.strip():
             raise ValueError("user_id must be a non-empty string.")
-        if not project_id or not project_id.strip():
-            raise ValueError("project_id must be a non-empty string.")
-        if not model or not model.strip():
-            raise ValueError("model must be a non-empty string.")
         if not math.isfinite(amount):
             raise ValueError("Amount must be a finite number.")
+        if project_id is not None and not project_id.strip():
+            raise ValueError("project_id must be a non-empty string if provided.")
+        if model is not None and not model.strip():
+            raise ValueError("model must be a non-empty string if provided.")
 
         await self.guard.record_spend(user_id, amount, project_id, model=model)
 
