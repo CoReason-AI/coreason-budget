@@ -30,7 +30,7 @@ async def test_end_to_end_flow(manager: BudgetManager) -> None:
     assert cost == 0.05
 
     # 3. Record spend
-    await manager.record_spend(user_id, cost, model="gpt-4")
+    await manager.record_spend(user_id, cost, project_id="proj_1", model="gpt-4")
 
     # 4. Check availability again (should pass)
     await manager.check_availability(user_id)
@@ -43,7 +43,7 @@ async def test_budget_exceeded_flow(manager: BudgetManager) -> None:
     limit = manager.config.daily_user_limit_usd  # 10.0
 
     # Record enough spend to reach limit
-    await manager.record_spend(user_id, limit, model="gpt-4")
+    await manager.record_spend(user_id, limit, project_id="proj_1", model="gpt-4")
 
     # Verify check fails
     with pytest.raises(BudgetExceededError):
@@ -57,7 +57,7 @@ async def test_check_availability_estimation_pass_through(manager: BudgetManager
     # Limit 10.0
 
     # 1. Spend 8.0
-    await manager.record_spend(user_id, 8.0)
+    await manager.record_spend(user_id, 8.0, project_id="proj_1", model="gpt-4")
 
     # 2. Check with 3.0 -> should fail (11.0 > 10.0)
     with pytest.raises(BudgetExceededError):

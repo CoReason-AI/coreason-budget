@@ -20,7 +20,7 @@ async def test_concurrency_race_condition(manager: BudgetManager) -> None:
     results = await asyncio.gather(*(task() for _ in range(20)), return_exceptions=True)
     assert len([r for r in results if r is True]) == 20
     for _ in range(20):
-        await manager.record_spend(user_id, 1.0)
+        await manager.record_spend(user_id, 1.0, project_id="proj_race", model="gpt-4")
     with pytest.raises(BudgetExceededError):
         await manager.check_availability(user_id, estimated_cost=1.0)
 
@@ -34,7 +34,7 @@ async def test_hierarchy_project_limit_hit_first() -> None:
     mgr.ledger._redis = FakeRedis(decode_responses=True)
     user_id = "user_h"
     project_id = "proj_h"
-    await mgr.record_spend(user_id, 10.0, project_id=project_id)
+    await mgr.record_spend(user_id, 10.0, project_id=project_id, model="gpt-4")
     with pytest.raises(BudgetExceededError):
         await mgr.check_availability(user_id, project_id=project_id, estimated_cost=1.0)
     await mgr.close()
@@ -107,12 +107,12 @@ async def test_ledger_increment_auto_connect() -> None:
 @pytest.mark.asyncio
 async def test_zero_and_negative_spend(manager: BudgetManager) -> None:
     user_id = "user_free"
-    await manager.record_spend(user_id, 0.0)
+    await manager.record_spend(user_id, 0.0, project_id="proj_free", model="gpt-4")
     await manager.check_availability(user_id)
-    await manager.record_spend(user_id, -5.0)
-    await manager.record_spend(user_id, 10.0)
+    await manager.record_spend(user_id, -5.0, project_id="proj_free", model="gpt-4")
+    await manager.record_spend(user_id, 10.0, project_id="proj_free", model="gpt-4")
     await manager.check_availability(user_id, estimated_cost=4.0)
-    await manager.record_spend(user_id, 5.0)
+    await manager.record_spend(user_id, 5.0, project_id="proj_free", model="gpt-4")
     with pytest.raises(BudgetExceededError):
         await manager.check_availability(user_id, estimated_cost=0.1)
 

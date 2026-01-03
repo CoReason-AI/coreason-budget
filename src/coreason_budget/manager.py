@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
+import math
 from typing import Optional
 
 from coreason_budget.config import CoreasonBudgetConfig
@@ -40,20 +41,30 @@ class BudgetManager:
             project_id: Optional project identifier. Required for checking project-level quotas.
             estimated_cost: Optional estimated cost of the request.
         """
+        if not user_id or not user_id.strip():
+            raise ValueError("user_id must be a non-empty string.")
+
         await self.guard.check_availability(user_id, project_id, estimated_cost=estimated_cost)
 
-    async def record_spend(
-        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
-    ) -> None:
+    async def record_spend(self, user_id: str, amount: float, project_id: str, model: str) -> None:
         """
         Post-flight charge: Record the actual spend.
 
         Args:
             user_id: The unique identifier for the user.
             amount: The actual cost in USD to record.
-            project_id: Optional project identifier. Strongly recommended to ensure project quotas are updated.
-            model: Optional model name. Strongly recommended for granular metric tagging (finops.spend.total).
+            project_id: Project identifier.
+            model: Model name.
         """
+        if not user_id or not user_id.strip():
+            raise ValueError("user_id must be a non-empty string.")
+        if not project_id or not project_id.strip():
+            raise ValueError("project_id must be a non-empty string.")
+        if not model or not model.strip():
+            raise ValueError("model must be a non-empty string.")
+        if not math.isfinite(amount):
+            raise ValueError("Amount must be a finite number.")
+
         await self.guard.record_spend(user_id, amount, project_id, model=model)
 
     async def close(self) -> None:

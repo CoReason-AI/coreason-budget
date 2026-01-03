@@ -14,7 +14,7 @@ async def test_small_precision_costs(manager: BudgetManager) -> None:
     tiny_cost = 0.0000001
 
     # Record a tiny spend
-    await manager.record_spend(user_id, tiny_cost)
+    await manager.record_spend(user_id, tiny_cost, project_id="proj_precision", model="gpt-4")
 
     # Check if it was recorded
     date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
@@ -32,7 +32,7 @@ async def test_negative_spend_refund(manager: BudgetManager) -> None:
     initial_spend = 5.0
     refund = -2.0
 
-    await manager.record_spend(user_id, initial_spend)
+    await manager.record_spend(user_id, initial_spend, project_id="proj_refund", model="gpt-4")
 
     date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
     key = f"spend:v1:user:{user_id}:{date_str}"
@@ -40,7 +40,7 @@ async def test_negative_spend_refund(manager: BudgetManager) -> None:
     usage_before = await manager.ledger.get_usage(key)
     assert pytest.approx(usage_before) == 5.0
 
-    await manager.record_spend(user_id, refund)
+    await manager.record_spend(user_id, refund, project_id="proj_refund", model="gpt-4")
 
     usage_after = await manager.ledger.get_usage(key)
     assert pytest.approx(usage_after) == 3.0
@@ -67,7 +67,7 @@ async def test_large_single_transaction_record(manager: BudgetManager) -> None:
     user_id = "user_overshoot"
     huge_cost = 20.0  # Limit is 10.0
 
-    await manager.record_spend(user_id, huge_cost)
+    await manager.record_spend(user_id, huge_cost, project_id="proj_overshoot", model="gpt-4")
 
     date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
     key = f"spend:v1:user:{user_id}:{date_str}"
@@ -95,7 +95,7 @@ async def test_midnight_rollover() -> None:
 
     # Day 1: 2023-10-27
     with patch.object(mgr.guard, "_get_date_str", return_value="2023-10-27"):
-        await mgr.record_spend(user_id, 5.0)
+        await mgr.record_spend(user_id, 5.0, project_id="proj_mid", model="gpt-4")
 
         key_day1 = "spend:v1:user:user_midnight:2023-10-27"
         usage = await mgr.ledger.get_usage(key_day1)
@@ -116,7 +116,7 @@ async def test_midnight_rollover() -> None:
 
         # Should allow full 10.0 spend
         await mgr.check_availability(user_id, estimated_cost=10.0)
-        await mgr.record_spend(user_id, 10.0)
+        await mgr.record_spend(user_id, 10.0, project_id="proj_mid", model="gpt-4")
 
         assert await mgr.ledger.get_usage(key_day2) == 10.0
 
@@ -132,7 +132,8 @@ async def test_empty_user_id() -> None:
 
     mgr.ledger._redis = FakeRedis(decode_responses=True)
 
-    await mgr.record_spend("", 1.0)
+    with pytest.raises(ValueError, match="user_id must be a non-empty string"):
+        await mgr.record_spend("", 1.0, project_id="proj_empty", model="gpt-4")
     await mgr.close()
 
 
