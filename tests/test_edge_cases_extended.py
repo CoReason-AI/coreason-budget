@@ -18,14 +18,14 @@ async def test_simultaneous_check_and_spend(manager: BudgetManager) -> None:
     # Total potential spend = 20.0 (exceeds 10.0)
     # Some should fail.
 
-    async def do_check():
+    async def do_check() -> str:
         try:
             await manager.check_availability(user_id, estimated_cost=1.1)
             return "ok"
         except BudgetExceededError:
             return "exceeded"
 
-    async def do_spend():
+    async def do_spend() -> str:
         await manager.record_spend(user_id, 1.0)
         return "spent"
 
