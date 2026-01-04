@@ -40,7 +40,10 @@ class BudgetGuard:
         midnight = datetime.datetime(
             year=tomorrow.year, month=tomorrow.month, day=tomorrow.day, tzinfo=datetime.timezone.utc
         )
-        return int((midnight - now).total_seconds())
+        seconds = int((midnight - now).total_seconds())
+        # Ensure minimum TTL of 1 second to prevent accidental key deletion
+        # (Redis EXPIRE with <= 0 deletes the key)
+        return max(1, seconds)
 
     def _get_keys_and_limits(self, user_id: str, project_id: Optional[str] = None) -> List[Tuple[str, float, str]]:
         """
