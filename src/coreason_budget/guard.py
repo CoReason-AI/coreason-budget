@@ -64,6 +64,18 @@ class BaseBudgetGuard:
 
         return items
 
+    def _check_limit_and_log(self, scope: str, limit: float, used: float, estimated_cost: float) -> None:
+        """Validate usage against limit and log result."""
+        # Fail if budget is already exhausted (used >= limit)
+        # OR if this specific request would exceed the limit (used + est > limit)
+        if used >= limit or (estimated_cost > 0 and used + estimated_cost > limit):
+            logger.warning("Budget exceeded for {}: Used ${} + Est ${} > Limit ${}", scope, used, estimated_cost, limit)
+            raise BudgetExceededError(f"{scope} daily limit of ${limit} reached.")
+
+        # Log successful check for this scope (User scope is most relevant to log if we want per-user tracking)
+        if "User" in scope:
+            logger.info("Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit)
+
 
 class BudgetGuard(BaseBudgetGuard):
     """Enforces budget limits asynchronously."""
@@ -83,17 +95,7 @@ class BudgetGuard(BaseBudgetGuard):
 
         for key, limit, scope in checks:
             used = await self.ledger.get_usage(key)
-            # Fail if budget is already exhausted (used >= limit)
-            # OR if this specific request would exceed the limit (used + est > limit)
-            if used >= limit or (estimated_cost > 0 and used + estimated_cost > limit):
-                logger.warning(
-                    "Budget exceeded for {}: Used ${} + Est ${} > Limit ${}", scope, used, estimated_cost, limit
-                )
-                raise BudgetExceededError(f"{scope} daily limit of ${limit} reached.")
-
-            # Log successful check for this scope (User scope is most relevant to log if we want per-user tracking)
-            if "User" in scope:
-                logger.info("Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit)
+            self._check_limit_and_log(scope, limit, used, estimated_cost)
 
     async def record_spend(
         self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
@@ -145,17 +147,7 @@ class SyncBudgetGuard(BaseBudgetGuard):
 
         for key, limit, scope in checks:
             used = self.ledger.get_usage(key)
-            # Fail if budget is already exhausted (used >= limit)
-            # OR if this specific request would exceed the limit (used + est > limit)
-            if used >= limit or (estimated_cost > 0 and used + estimated_cost > limit):
-                logger.warning(
-                    "Budget exceeded for {}: Used ${} + Est ${} > Limit ${}", scope, used, estimated_cost, limit
-                )
-                raise BudgetExceededError(f"{scope} daily limit of ${limit} reached.")
-
-            # Log successful check for this scope (User scope is most relevant to log if we want per-user tracking)
-            if "User" in scope:
-                logger.info("Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit)
+            self._check_limit_and_log(scope, limit, used, estimated_cost)
 
     def record_spend(
         self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None

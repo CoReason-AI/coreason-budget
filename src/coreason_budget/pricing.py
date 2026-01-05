@@ -38,7 +38,7 @@ class PricingEngine:
         if self.config and model in self.config.model_price_overrides:
             price = self.config.model_price_overrides[model]
             cost = (input_tokens * price.input_cost_per_token) + (output_tokens * price.output_cost_per_token)
-            logger.info("Using override pricing for model {}: ${}", model, cost)
+            logger.debug("Using override pricing for model {}: ${}", model, cost)
             return cost
 
         try:
