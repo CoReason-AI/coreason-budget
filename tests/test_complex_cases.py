@@ -54,22 +54,14 @@ async def test_redis_ledger_error_handling(manager: BudgetManager) -> None:
 
 
 @pytest.mark.asyncio
-async def test_redis_connect_failure_from_url() -> None:
-    ledger = RedisLedger("redis://localhost:6379")
-    with patch("coreason_budget.ledger.from_url", side_effect=RedisError("Connect Failed")):
-        with pytest.raises(RedisConnectionError):
-            await ledger.connect()
-
-
-@pytest.mark.asyncio
 async def test_redis_connect_failure_ping() -> None:
     # Cover lines 32-33: ping fails
-    ledger = RedisLedger("redis://localhost:6379")
+    # Need to patch from_url BEFORE creating ledger, because it is called in __init__
     mock_redis = MagicMock()
     mock_redis.ping = AsyncMock(side_effect=RedisError("Ping Failed"))
-    # The mock needs to be returned by from_url
 
     with patch("coreason_budget.ledger.from_url", return_value=mock_redis):
+        ledger = RedisLedger("redis://localhost:6379")
         with pytest.raises(RedisConnectionError):
             await ledger.connect()
 
@@ -77,31 +69,13 @@ async def test_redis_connect_failure_ping() -> None:
 @pytest.mark.asyncio
 async def test_ledger_close_coverage() -> None:
     # Cover line 48: close when _redis is NOT None
-    ledger = RedisLedger("redis://localhost:6379")
     mock_redis = MagicMock()
     mock_redis.aclose = AsyncMock()
-    ledger._redis = mock_redis
-    await ledger.close()
-    mock_redis.aclose.assert_called_once()
-    assert ledger._redis is None
 
-
-@pytest.mark.asyncio
-async def test_ledger_increment_auto_connect() -> None:
-    # Cover line 72: increment calls connect
-    ledger = RedisLedger("redis://localhost:6379")
-
-    mock_redis = MagicMock()
-    mock_redis.eval = AsyncMock(return_value=1.0)
-
-    # We mock connect to set the _redis to our mock
-    async def side_effect() -> None:
-        ledger._redis = mock_redis
-
-    with patch.object(ledger, "connect", side_effect=side_effect) as mock_connect:
-        await ledger.increment("key", 1.0)
-        mock_connect.assert_called_once()
-        mock_redis.eval.assert_called_once()
+    with patch("coreason_budget.ledger.from_url", return_value=mock_redis):
+        ledger = RedisLedger("redis://localhost:6379")
+        await ledger.close()
+        mock_redis.aclose.assert_called_once()
 
 
 @pytest.mark.asyncio

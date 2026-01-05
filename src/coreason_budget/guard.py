@@ -36,13 +36,10 @@ class BudgetGuard:
     def _get_ttl_seconds(self) -> int:
         """Get seconds until next UTC midnight."""
         now = datetime.datetime.now(datetime.timezone.utc)
-        tomorrow = now + datetime.timedelta(days=1)
-        midnight = datetime.datetime(
-            year=tomorrow.year, month=tomorrow.month, day=tomorrow.day, tzinfo=datetime.timezone.utc
-        )
+        # Calculate next midnight
+        midnight = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         seconds = int((midnight - now).total_seconds())
         # Ensure minimum TTL of 1 second to prevent accidental key deletion
-        # (Redis EXPIRE with <= 0 deletes the key)
         return max(1, seconds)
 
     def _get_keys_and_limits(self, user_id: str, project_id: Optional[str] = None) -> List[Tuple[str, float, str]]:

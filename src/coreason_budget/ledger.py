@@ -22,35 +22,29 @@ class RedisLedger:
 
     def __init__(self, redis_url: str) -> None:
         self.redis_url = redis_url
-        self._redis: Optional[Redis] = None
+        # redis-py handles connection pooling automatically.
+        # We initialize it here but it connects lazily.
+        self._redis: Redis = from_url(self.redis_url, encoding="utf-8", decode_responses=True)
 
     async def connect(self) -> None:
-        """Establish connection to Redis."""
-        if self._redis is None:
-            try:
-                self._redis = from_url(self.redis_url, encoding="utf-8", decode_responses=True)
-                await self._redis.ping()
-                logger.info("Connected to Redis at {}", self.redis_url)
-            except RedisError as e:
-                logger.error("Failed to connect to Redis: {}", e)
-                raise RedisConnectionError(f"Could not connect to Redis: {e}") from e
+        """
+        Verify connection to Redis.
+        Strictly required for 'Fail Closed' startup checks.
+        """
+        try:
+            await self._redis.ping()
+            logger.info("Connected to Redis at {}", self.redis_url)
+        except RedisError as e:
+            logger.error("Failed to connect to Redis: {}", e)
+            raise RedisConnectionError(f"Could not connect to Redis: {e}") from e
 
     async def close(self) -> None:
-        """Close the Redis connection."""
-        if self._redis:
-            await self._redis.aclose()
-            self._redis = None
-            logger.info("Closed Redis connection")
+        """Close the Redis connection pool."""
+        await self._redis.aclose()
+        logger.info("Closed Redis connection")
 
     async def get_usage(self, key: str) -> float:
         """Get current usage for a key. Returns 0.0 if key does not exist."""
-        if not self._redis:
-            await self.connect()
-
-        # This check is technically redundant if connect() always works or raises,
-        # but satisfies type checkers.
-        assert self._redis is not None
-
         try:
             val = await self._redis.get(key)
             return float(val) if val else 0.0
@@ -68,11 +62,6 @@ class RedisLedger:
 
         Returns the new value.
         """
-        if not self._redis:
-            await self.connect()
-
-        assert self._redis is not None
-
         # Lua script to increment and optionally set expiry if not set
         # ARGV[1]: amount
         # ARGV[2]: ttl (optional)

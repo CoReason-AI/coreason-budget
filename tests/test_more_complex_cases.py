@@ -96,12 +96,14 @@ async def test_lua_ttl_logic_existing_key_with_expiry() -> None:
 @pytest.mark.asyncio
 async def test_ledger_connect_exception_propagation() -> None:
     """Explicitly verify propagation of RedisConnectionError in connect."""
-    ledger = RedisLedger("redis://localhost:6379")
     mock_redis = MagicMock()
     # Mock ping to raise RedisError
     mock_redis.ping = AsyncMock(side_effect=RedisError("Ping fail"))
 
+    # We must patch from_url BEFORE creating the ledger instance,
+    # because __init__ calls from_url.
     with patch("coreason_budget.ledger.from_url", return_value=mock_redis):
+        ledger = RedisLedger("redis://localhost:6379")
         with pytest.raises(RedisConnectionError, match="Could not connect to Redis"):
             await ledger.connect()
 
