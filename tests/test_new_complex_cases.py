@@ -2,7 +2,6 @@ import os
 from unittest.mock import patch
 
 import pytest
-from redis.exceptions import ConnectionError as RedisConnectionError
 
 from coreason_budget import BudgetConfig, BudgetManager
 
@@ -92,17 +91,10 @@ async def test_non_finite_amounts(manager: BudgetManager) -> None:
 async def test_garbage_redis_url() -> None:
     """Test invalid Redis URL handling."""
     config = BudgetConfig(redis_url="notarealprotocol://bad-url")
-    mgr = BudgetManager(config)
-
-    try:
-        # We expect a failure either here or in get_usage/connect
-        await mgr.ledger.connect()
-    except (ValueError, RedisConnectionError, Exception):
-        # We just want to ensure it doesn't hang or crash the process ungracefully
-        # The specific exception depends on library versions
-        pass
-    finally:
-        await mgr.close()
+    # redis-py's from_url validates the scheme immediately.
+    # So this should raise ValueError on initialization.
+    with pytest.raises(ValueError):
+        BudgetManager(config)
 
 
 @pytest.mark.asyncio

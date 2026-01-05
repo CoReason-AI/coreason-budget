@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -36,29 +36,28 @@ async def ledger(redis_url: str) -> RedisLedger:
 @pytest.mark.asyncio
 async def test_ledger_connection_success(redis_url: str) -> None:
     """Test connection establishment success."""
-    ledger = RedisLedger(redis_url)
     # We need to mock from_url to return a mock or fakeredis that doesn't fail ping
-    with patch("coreason_budget.ledger.from_url") as mock_from_url:
-        mock_redis = MagicMock()
+    mock_redis = MagicMock()
+    # Ping must be awaitable
+    mock_redis.ping = AsyncMock(return_value=True)
 
-        # Ping must be awaitable
-        async def async_ping() -> bool:
-            return True
-
-        mock_redis.ping.side_effect = async_ping
-        mock_from_url.return_value = mock_redis
-
+    with patch("coreason_budget.ledger.from_url", return_value=mock_redis):
+        ledger = RedisLedger(redis_url)
         await ledger.connect()
-        mock_from_url.assert_called_once()
-        # Verify logging? Implicitly covered if no error.
+        mock_redis.ping.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_ledger_connection_failure(redis_url: str) -> None:
     """Test connection establishment failure."""
-    ledger = RedisLedger(redis_url)
-    with patch("coreason_budget.ledger.from_url") as mock_from_url:
-        mock_from_url.side_effect = RedisError("Connection refused")
+    # Since from_url is called in __init__, if it fails there, we catch it there.
+    # But this test checks 'connect' method failure.
+    # connect calls ping.
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(side_effect=RedisError("Connection refused"))
+
+    with patch("coreason_budget.ledger.from_url", return_value=mock_redis):
+        ledger = RedisLedger(redis_url)
         with pytest.raises(RedisConnectionError):
             await ledger.connect()
 
@@ -66,43 +65,37 @@ async def test_ledger_connection_failure(redis_url: str) -> None:
 @pytest.mark.asyncio
 async def test_close(ledger: RedisLedger) -> None:
     """Test close connection."""
+    # _redis is a Mock in the fixture if patched, or FakeRedis.
+    # FakeRedis.aclose is async.
     await ledger.close()
-    assert ledger._redis is None
+    # We don't set it to None anymore, we just close the pool.
+    # So we check if aclose was called (if it's a mock) or just ensure no error.
+    if isinstance(ledger._redis, MagicMock):
+        ledger._redis.aclose.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_auto_connect_get_usage(redis_url: str) -> None:
-    """Test auto-connect in get_usage."""
-    ledger = RedisLedger(redis_url)
-    # Mock connect to populate _redis
-    with patch.object(RedisLedger, "connect") as mock_connect:
-        # We need _redis to be set after connect, or we manually set it
-        # But connect is mocked, so we must simulate what it does or set _redis beforehand?
-        # No, the code calls connect(), then asserts _redis is not None.
-        # So our mock_connect should set _redis.
-        async def side_effect() -> None:
-            ledger._redis = aioredis.FakeRedis(decode_responses=True)
+async def test_get_usage_with_mock(redis_url: str) -> None:
+    """Test get_usage with mock."""
+    mock_redis = MagicMock()
+    mock_redis.get = AsyncMock(return_value=None)
 
-        mock_connect.side_effect = side_effect
-
+    with patch("coreason_budget.ledger.from_url", return_value=mock_redis):
+        ledger = RedisLedger(redis_url)
         val = await ledger.get_usage("some_key")
         assert val == 0.0
-        mock_connect.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_auto_connect_increment(redis_url: str) -> None:
-    """Test auto-connect in increment."""
-    ledger = RedisLedger(redis_url)
-    with patch.object(RedisLedger, "connect") as mock_connect:
+async def test_increment_with_mock(redis_url: str) -> None:
+    """Test increment with mock."""
+    mock_redis = MagicMock()
+    mock_redis.eval = AsyncMock(return_value=1.0)
 
-        async def side_effect() -> None:
-            ledger._redis = aioredis.FakeRedis(decode_responses=True)
-
-        mock_connect.side_effect = side_effect
-
+    with patch("coreason_budget.ledger.from_url", return_value=mock_redis):
+        ledger = RedisLedger(redis_url)
         await ledger.increment("some_key", 1.0)
-        mock_connect.assert_called_once()
+        mock_redis.eval.assert_called_once()
 
 
 @pytest.mark.asyncio
