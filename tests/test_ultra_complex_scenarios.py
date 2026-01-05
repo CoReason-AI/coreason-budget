@@ -82,6 +82,9 @@ async def test_ttl_first_write_persistence() -> None:
 
     # Check TTL in redis
     actual_ttl = await mgr.ledger._redis.ttl(key)
+    # Verify that it is POSITIVE (meaning it has an expiry), not -1 (persist) or -2 (missing)
+    assert actual_ttl > 0, "New key should have an expiry set!"
+
     # In fakeredis, TTL might be slightly less than set value immediately, or exactly.
     assert actual_ttl <= fixed_ttl
     assert actual_ttl > fixed_ttl - 5  # Allow small delay
