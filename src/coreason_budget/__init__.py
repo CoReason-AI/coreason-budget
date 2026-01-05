@@ -17,13 +17,14 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.guard import BudgetExceededError
-from coreason_budget.manager import BudgetManager
+from coreason_budget.manager import BudgetManager, SyncBudgetManager
 
 # Alias for convenience/compatibility with intended usage
 BudgetConfig = CoreasonBudgetConfig
 
 __all__ = [
     "BudgetManager",
+    "SyncBudgetManager",
     "BudgetConfig",
     "CoreasonBudgetConfig",
     "BudgetExceededError",
