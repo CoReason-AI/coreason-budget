@@ -1,5 +1,5 @@
 import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -117,17 +117,16 @@ async def test_very_large_input_tokens() -> None:
     # Mock pricing to just multiply
     # We can't use real pricing for 1B tokens without credentials likely, or it's fine.
     # Let's mock it to return a huge number.
-    mgr.pricing.calculate = MagicMock(return_value=1_000_000.0)
+    with patch.object(mgr.pricing, "calculate", return_value=1_000_000.0):
+        user_id = "user_huge"
+        # Pre-flight check should fail against 10.0 limit
+        from coreason_budget.guard import BudgetExceededError
 
-    user_id = "user_huge"
-    # Pre-flight check should fail against 10.0 limit
-    from coreason_budget.guard import BudgetExceededError
+        with pytest.raises(BudgetExceededError):
+            await mgr.check_availability(user_id, estimated_cost=1_000_000.0)
 
-    with pytest.raises(BudgetExceededError):
-        await mgr.check_availability(user_id, estimated_cost=1_000_000.0)
-
-    # Record spend (maybe post-flight without pre-flight check)
-    await mgr.record_spend(user_id, 1_000_000.0)
+        # Record spend (maybe post-flight without pre-flight check)
+        await mgr.record_spend(user_id, 1_000_000.0)
 
     usage = await mgr.ledger.get_usage(
         f"spend:v1:user:{user_id}:{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')}"
