@@ -1,8 +1,8 @@
-from typing import Any, Dict, Optional
-from decimal import Decimal
 import litellm
+
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.utils.logger import logger
+
 
 class PricingEngine:
     """
@@ -38,10 +38,10 @@ class PricingEngine:
             # liteLLM docs say it returns cost as float.
             cost = litellm.completion_cost(
                 model=model,
-                prompt=None, # We can pass tokens directly
+                prompt=None,  # We can pass tokens directly
                 completion=None,
                 total_input_tokens=input_tokens,
-                total_output_tokens=output_tokens
+                total_output_tokens=output_tokens,
             )
             return float(cost)
         except Exception as e:

@@ -1,10 +1,12 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from datetime import datetime
-from coreason_budget.guard import BudgetGuard, SyncBudgetGuard
+
 from coreason_budget.config import CoreasonBudgetConfig
-from coreason_budget.ledger import RedisLedger, SyncRedisLedger
 from coreason_budget.exceptions import BudgetExceededError
+from coreason_budget.guard import BudgetGuard, SyncBudgetGuard
+from coreason_budget.ledger import RedisLedger, SyncRedisLedger
+
 
 @pytest.fixture
 def config() -> CoreasonBudgetConfig:
@@ -12,8 +14,9 @@ def config() -> CoreasonBudgetConfig:
         redis_url="redis://localhost",
         daily_global_limit_usd=100.0,
         daily_project_limit_usd=50.0,
-        daily_user_limit_usd=10.0
+        daily_user_limit_usd=10.0,
     )
+
 
 @pytest.mark.asyncio
 async def test_guard_check_success(config: CoreasonBudgetConfig) -> None:
@@ -30,6 +33,7 @@ async def test_guard_check_success(config: CoreasonBudgetConfig) -> None:
     # Should check global, project, user
     assert ledger.get_usage.call_count == 3
 
+
 @pytest.mark.asyncio
 async def test_guard_check_global_limit(config: CoreasonBudgetConfig) -> None:
     ledger = MagicMock(spec=RedisLedger)
@@ -41,6 +45,7 @@ async def test_guard_check_global_limit(config: CoreasonBudgetConfig) -> None:
 
     with pytest.raises(BudgetExceededError, match="Global daily limit exceeded"):
         await guard.check("user1", "proj1", 2.0)
+
 
 @pytest.mark.asyncio
 async def test_guard_check_project_limit(config: CoreasonBudgetConfig) -> None:
@@ -56,6 +61,7 @@ async def test_guard_check_project_limit(config: CoreasonBudgetConfig) -> None:
     with pytest.raises(BudgetExceededError, match="Project daily limit exceeded"):
         await guard.check("user1", "proj1", 2.0)
 
+
 @pytest.mark.asyncio
 async def test_guard_check_user_limit(config: CoreasonBudgetConfig) -> None:
     ledger = MagicMock(spec=RedisLedger)
@@ -66,6 +72,7 @@ async def test_guard_check_user_limit(config: CoreasonBudgetConfig) -> None:
 
     with pytest.raises(BudgetExceededError, match="User daily limit exceeded"):
         await guard.check("user1", "proj1", 2.0)
+
 
 @pytest.mark.asyncio
 async def test_guard_charge(config: CoreasonBudgetConfig) -> None:
@@ -78,7 +85,8 @@ async def test_guard_charge(config: CoreasonBudgetConfig) -> None:
     # Here we just check calls.
     await guard.charge("user1", 5.0, "proj1")
 
-    assert ledger.increment.call_count == 3 # Global, Project, User
+    assert ledger.increment.call_count == 3  # Global, Project, User
+
 
 def test_sync_guard_check_success(config: CoreasonBudgetConfig) -> None:
     ledger = MagicMock(spec=SyncRedisLedger)
@@ -87,6 +95,7 @@ def test_sync_guard_check_success(config: CoreasonBudgetConfig) -> None:
     guard = SyncBudgetGuard(config, ledger)
 
     assert guard.check("user1", "proj1", 5.0) is True
+
 
 def test_sync_guard_check_user_limits(config: CoreasonBudgetConfig) -> None:
     ledger = MagicMock(spec=SyncRedisLedger)
@@ -97,6 +106,7 @@ def test_sync_guard_check_user_limits(config: CoreasonBudgetConfig) -> None:
     with pytest.raises(BudgetExceededError, match="User daily limit exceeded"):
         guard.check("user1", "proj1", 2.0)
 
+
 def test_sync_guard_check_global_limit(config: CoreasonBudgetConfig) -> None:
     ledger = MagicMock(spec=SyncRedisLedger)
     guard = SyncBudgetGuard(config, ledger)
@@ -106,6 +116,7 @@ def test_sync_guard_check_global_limit(config: CoreasonBudgetConfig) -> None:
     with pytest.raises(BudgetExceededError, match="Global daily limit exceeded"):
         guard.check("user1", "proj1", 2.0)
 
+
 def test_sync_guard_check_project_limit(config: CoreasonBudgetConfig) -> None:
     ledger = MagicMock(spec=SyncRedisLedger)
     guard = SyncBudgetGuard(config, ledger)
@@ -114,6 +125,7 @@ def test_sync_guard_check_project_limit(config: CoreasonBudgetConfig) -> None:
     ledger.get_usage.side_effect = [0.0, 49.0]
     with pytest.raises(BudgetExceededError, match="Project daily limit exceeded"):
         guard.check("user1", "proj1", 2.0)
+
 
 def test_sync_guard_charge(config: CoreasonBudgetConfig) -> None:
     ledger = MagicMock(spec=SyncRedisLedger)

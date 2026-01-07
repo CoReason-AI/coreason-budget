@@ -1,9 +1,9 @@
-from typing import Optional
 from datetime import datetime, timezone
+from typing import Optional
 
 from coreason_budget.config import CoreasonBudgetConfig
-from coreason_budget.ledger import RedisLedger, SyncRedisLedger
 from coreason_budget.exceptions import BudgetExceededError
+from coreason_budget.ledger import RedisLedger, SyncRedisLedger
 from coreason_budget.utils.logger import logger
 
 
@@ -35,7 +35,7 @@ class BaseBudgetGuard:
         """
         now = datetime.now(timezone.utc)
         # Midnight next day
-        midnight = (now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() + 86400)
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() + 86400
         current = now.timestamp()
         return int(midnight - current)
 
@@ -57,26 +57,40 @@ class BudgetGuard(BaseBudgetGuard):
         # 1. Global Check
         global_usage = await self.ledger.get_usage(keys["global"])
         if global_usage + estimated_cost > self.config.daily_global_limit_usd:
-            logger.warning("Global budget exceeded. Used: ${}, Limit: ${}", global_usage, self.config.daily_global_limit_usd)
+            logger.warning(
+                "Global budget exceeded. Used: ${}, Limit: ${}", global_usage, self.config.daily_global_limit_usd
+            )
             raise BudgetExceededError("Global daily limit exceeded")
 
         # 2. Project Check
         if project_id and "project" in keys:
             project_usage = await self.ledger.get_usage(keys["project"])
             if project_usage + estimated_cost > self.config.daily_project_limit_usd:
-                logger.warning("Project budget exceeded. Project: {}, Used: ${}, Limit: ${}", project_id, project_usage, self.config.daily_project_limit_usd)
+                logger.warning(
+                    "Project budget exceeded. Project: {}, Used: ${}, Limit: ${}",
+                    project_id,
+                    project_usage,
+                    self.config.daily_project_limit_usd,
+                )
                 raise BudgetExceededError(f"Project daily limit exceeded for {project_id}")
 
         # 3. User Check
         user_usage = await self.ledger.get_usage(keys["user"])
         if user_usage + estimated_cost > self.config.daily_user_limit_usd:
-            logger.warning("User budget exceeded. User: {}, Used: ${}, Limit: ${}", user_id, user_usage, self.config.daily_user_limit_usd)
+            logger.warning(
+                "User budget exceeded. User: {}, Used: ${}, Limit: ${}",
+                user_id,
+                user_usage,
+                self.config.daily_user_limit_usd,
+            )
             raise BudgetExceededError(f"User daily limit exceeded for {user_id}")
 
         logger.info("Budget Check Passed: User {} | Estimated Cost: ${}", user_id, estimated_cost)
         return True
 
-    async def charge(self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None) -> None:
+    async def charge(
+        self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
+    ) -> None:
         """
         Record actual spend.
         Updates counters for all scopes.
@@ -85,17 +99,9 @@ class BudgetGuard(BaseBudgetGuard):
         ttl = self._calculate_ttl()
 
         for key in keys.values():
-             await self.ledger.increment(key, cost, ttl)
+            await self.ledger.increment(key, cost, ttl)
 
         # Observability
-        # Log: "Budget Check: User [ID] | Used: $[X] / Limit: $[Y]"
-        # Requirement says "Log: 'Budget Check...'" but here we are charging.
-        # Maybe the log should be "Transaction Cost: $X".
-        # The requirement "Observability" section says:
-        # "Log: 'Budget Check: User [ID] | Used: $[X] / Limit: $[Y]'"
-        # "Metric: finops.spend.total (Counter, tagged by Model and Project)"
-        # Since I don't have a metrics lib, I will log structured data that can be parsed.
-
         logger.info(
             "Transaction Recorded",
             extra={
@@ -103,10 +109,9 @@ class BudgetGuard(BaseBudgetGuard):
                 "user_id": user_id,
                 "project_id": project_id,
                 "model": model,
-                "cost_usd": cost
-            }
+                "cost_usd": cost,
+            },
         )
-        # Also legacy human readable log as requested
         logger.info("Recorded Spend: User {} | Cost: ${} | Project: {} | Model: {}", user_id, cost, project_id, model)
 
 
@@ -122,18 +127,30 @@ class SyncBudgetGuard(BaseBudgetGuard):
 
         global_usage = self.ledger.get_usage(keys["global"])
         if global_usage + estimated_cost > self.config.daily_global_limit_usd:
-            logger.warning("Global budget exceeded. Used: ${}, Limit: ${}", global_usage, self.config.daily_global_limit_usd)
+            logger.warning(
+                "Global budget exceeded. Used: ${}, Limit: ${}", global_usage, self.config.daily_global_limit_usd
+            )
             raise BudgetExceededError("Global daily limit exceeded")
 
         if project_id and "project" in keys:
             project_usage = self.ledger.get_usage(keys["project"])
             if project_usage + estimated_cost > self.config.daily_project_limit_usd:
-                 logger.warning("Project budget exceeded. Project: {}, Used: ${}, Limit: ${}", project_id, project_usage, self.config.daily_project_limit_usd)
-                 raise BudgetExceededError(f"Project daily limit exceeded for {project_id}")
+                logger.warning(
+                    "Project budget exceeded. Project: {}, Used: ${}, Limit: ${}",
+                    project_id,
+                    project_usage,
+                    self.config.daily_project_limit_usd,
+                )
+                raise BudgetExceededError(f"Project daily limit exceeded for {project_id}")
 
         user_usage = self.ledger.get_usage(keys["user"])
         if user_usage + estimated_cost > self.config.daily_user_limit_usd:
-            logger.warning("User budget exceeded. User: {}, Used: ${}, Limit: ${}", user_id, user_usage, self.config.daily_user_limit_usd)
+            logger.warning(
+                "User budget exceeded. User: {}, Used: ${}, Limit: ${}",
+                user_id,
+                user_usage,
+                self.config.daily_user_limit_usd,
+            )
             raise BudgetExceededError(f"User daily limit exceeded for {user_id}")
 
         logger.info("Budget Check Passed: User {} | Estimated Cost: ${}", user_id, estimated_cost)
@@ -153,7 +170,7 @@ class SyncBudgetGuard(BaseBudgetGuard):
                 "user_id": user_id,
                 "project_id": project_id,
                 "model": model,
-                "cost_usd": cost
-            }
+                "cost_usd": cost,
+            },
         )
         logger.info("Recorded Spend: User {} | Cost: ${} | Project: {} | Model: {}", user_id, cost, project_id, model)

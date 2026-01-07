@@ -1,27 +1,28 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from coreason_budget.manager import BudgetManager
+
 from coreason_budget.config import CoreasonBudgetConfig
+from coreason_budget.manager import BudgetManager
+
 
 @pytest.fixture
 def config() -> CoreasonBudgetConfig:
     return CoreasonBudgetConfig(redis_url="redis://localhost")
 
+
 @pytest.fixture
 def manager(config: CoreasonBudgetConfig) -> None:
-    # We need to mock the ledgers creation inside __init__ to avoid real connections or fakeredis if we want pure unit tests
-    # But using fakeredis is better for integration.
+    # We need to mock the ledgers creation inside __init__ to avoid real connections or fakeredis
+    # if we want pure unit tests. But using fakeredis is better for integration.
     # However, here we want to test Manager delegating to Guard/Ledger.
-    # So we can patch BudgetGuard and SyncBudgetGuard?
-    # Or just patch redis.
     pass
+
 
 @pytest.mark.asyncio
 async def test_manager_async_flow(config: CoreasonBudgetConfig) -> None:
     # Mock at the Redis level
-    with patch("coreason_budget.ledger.from_url") as mock_async_redis, \
-         patch("coreason_budget.ledger.sync_from_url"):
-
+    with patch("coreason_budget.ledger.from_url") as mock_async_redis, patch("coreason_budget.ledger.sync_from_url"):
         # Setup mocks
         mock_async = AsyncMock()
         mock_async_redis.return_value = mock_async
@@ -44,10 +45,9 @@ async def test_manager_async_flow(config: CoreasonBudgetConfig) -> None:
 
         await mgr.close()
 
-def test_manager_sync_flow(config: CoreasonBudgetConfig) -> None:
-    with patch("coreason_budget.ledger.from_url"), \
-         patch("coreason_budget.ledger.sync_from_url") as mock_sync_redis:
 
+def test_manager_sync_flow(config: CoreasonBudgetConfig) -> None:
+    with patch("coreason_budget.ledger.from_url"), patch("coreason_budget.ledger.sync_from_url") as mock_sync_redis:
         mock_sync = MagicMock()
         mock_sync_redis.return_value = mock_sync
         mock_sync.get.return_value = "0.0"
@@ -65,6 +65,7 @@ def test_manager_sync_flow(config: CoreasonBudgetConfig) -> None:
 
         # close calls sync_ledger.close
         mgr._sync_ledger.close()
+
 
 def test_manager_pricing_access(config: CoreasonBudgetConfig) -> None:
     with patch("coreason_budget.ledger.from_url"), patch("coreason_budget.ledger.sync_from_url"):

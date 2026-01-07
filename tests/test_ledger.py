@@ -1,13 +1,16 @@
-import pytest
 from unittest.mock import MagicMock, patch
-import fakeredis.aioredis
+
 import fakeredis
+import fakeredis.aioredis
+import pytest
 from redis.exceptions import ConnectionError as RedisPyConnectionError
 from redis.exceptions import RedisError
-from coreason_budget.ledger import RedisLedger, SyncRedisLedger, LUA_INCREMENT_SCRIPT
+
 from coreason_budget.exceptions import RedisConnectionError
+from coreason_budget.ledger import RedisLedger, SyncRedisLedger
 
 # We need to test both Async and Sync ledgers
+
 
 @pytest.mark.asyncio
 async def test_async_ledger_increment_and_expiry() -> None:
@@ -24,7 +27,7 @@ async def test_async_ledger_increment_and_expiry() -> None:
         # Test 1: Increment new key with TTL
         key = "test:budget:1"
         amount = 10.5
-        ttl = 3600 # 1 hour
+        ttl = 3600  # 1 hour
 
         new_val = await ledger.increment(key, amount, ttl)
         assert new_val == 10.5
@@ -67,6 +70,7 @@ async def test_async_ledger_increment_and_expiry() -> None:
 
         await ledger.close()
 
+
 def test_sync_ledger_increment_and_expiry() -> None:
     fake_redis = fakeredis.FakeRedis(decode_responses=True)
 
@@ -96,6 +100,7 @@ def test_sync_ledger_increment_and_expiry() -> None:
 
         ledger.close()
 
+
 @pytest.mark.asyncio
 async def test_ledger_connection_error() -> None:
     # Simulate connection error
@@ -109,6 +114,7 @@ async def test_ledger_connection_error() -> None:
         with pytest.raises(RedisConnectionError, match="Could not connect to Redis"):
             await ledger.connect()
 
+
 @pytest.mark.asyncio
 async def test_ledger_get_error() -> None:
     with patch("coreason_budget.ledger.from_url") as mock_from_url:
@@ -121,6 +127,7 @@ async def test_ledger_get_error() -> None:
         with pytest.raises(RedisError):
             await ledger.get_usage("some-key")
 
+
 @pytest.mark.asyncio
 async def test_ledger_increment_error() -> None:
     with patch("coreason_budget.ledger.from_url") as mock_from_url:
@@ -132,6 +139,7 @@ async def test_ledger_increment_error() -> None:
 
         with pytest.raises(RedisError):
             await ledger.increment("some-key", 10.0)
+
 
 def test_sync_ledger_errors() -> None:
     with patch("coreason_budget.ledger.sync_from_url") as mock_from_url:
