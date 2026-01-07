@@ -85,7 +85,14 @@ class BudgetGuard(BaseBudgetGuard):
             )
             raise BudgetExceededError(f"User daily limit exceeded for {user_id}")
 
-        logger.info("Budget Check Passed: User {} | Estimated Cost: ${}", user_id, estimated_cost)
+        # Success Log with details
+        logger.info(
+            "Budget Check Passed: User {} | Estimated Cost: ${} | Global Used: ${} | User Used: ${}",
+            user_id,
+            estimated_cost,
+            global_usage,
+            user_usage,
+        )
         return True
 
     async def charge(
@@ -153,7 +160,13 @@ class SyncBudgetGuard(BaseBudgetGuard):
             )
             raise BudgetExceededError(f"User daily limit exceeded for {user_id}")
 
-        logger.info("Budget Check Passed: User {} | Estimated Cost: ${}", user_id, estimated_cost)
+        logger.info(
+            "Budget Check Passed: User {} | Estimated Cost: ${} | Global Used: ${} | User Used: ${}",
+            user_id,
+            estimated_cost,
+            global_usage,
+            user_usage,
+        )
         return True
 
     def charge(self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None) -> None:

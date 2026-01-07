@@ -12,7 +12,7 @@ logger.add(sys.stderr, level=os.getenv("LOG_LEVEL", "INFO"))
 
 # Add file handler
 # Ensure logs directory exists
-log_path = "logs/app.log"
+log_path = os.getenv("COREASON_BUDGET_LOG_PATH", "logs/app.log")
 os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
 logger.add(

@@ -1,6 +1,6 @@
-from typing import Dict
+from typing import Any, Dict
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,15 @@ class CoreasonBudgetConfig(BaseSettings):  # type: ignore
     model_config = SettingsConfigDict(
         env_prefix="COREASON_BUDGET_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def alias_daily_limit(cls, data: Any) -> Any:
+        """Allow 'daily_limit_usd' as an alias for 'daily_user_limit_usd'."""
+        if isinstance(data, dict):
+            if "daily_limit_usd" in data and "daily_user_limit_usd" not in data:
+                data["daily_user_limit_usd"] = data["daily_limit_usd"]
+        return data
 
 
 # Alias for ease of use

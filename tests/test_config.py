@@ -28,3 +28,14 @@ def test_config_env_vars(monkeypatch: MonkeyPatch) -> None:
     config = CoreasonBudgetConfig()
     assert config.redis_url == "redis://env:6379"
     assert config.daily_user_limit_usd == 25.0
+
+
+def test_config_alias() -> None:
+    # Test that daily_limit_usd works as alias for daily_user_limit_usd
+    # We pass it as kwargs to constructor, but pydantic V2 model validator (mode='before') handles input dict.
+    # When using keywords arguments, they are passed as a dict to validation.
+    config = CoreasonBudgetConfig(
+        redis_url="redis://localhost",
+        daily_limit_usd=50.0,
+    )
+    assert config.daily_user_limit_usd == 50.0
