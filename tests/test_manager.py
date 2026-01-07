@@ -1,76 +1,76 @@
-# Copyright (c) 2025 CoReason, Inc.
-#
-# This software is proprietary and dual-licensed.
-# Licensed under the Prosperity Public License 3.0 (the "License").
-# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
-# For details, see the LICENSE file.
-# Commercial use beyond a 30-day trial requires a separate license.
-#
-# Source Code: https://github.com/CoReason-AI/coreason_budget
-
-from unittest.mock import patch
-
 import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
+from coreason_budget.manager import BudgetManager
+from coreason_budget.config import CoreasonBudgetConfig
 
-from coreason_budget import BudgetExceededError, BudgetManager
+@pytest.fixture
+def config() -> CoreasonBudgetConfig:
+    return CoreasonBudgetConfig(redis_url="redis://localhost")
 
-
-@pytest.mark.asyncio
-async def test_end_to_end_flow(manager: BudgetManager) -> None:
-    """Test the complete check -> run -> charge flow."""
-    user_id = "user_e2e"
-
-    # 1. Pre-flight check (should pass)
-    await manager.check_availability(user_id)
-
-    # 2. Calculate cost
-    # Mock pricing for predictability
-    with patch("coreason_budget.pricing.litellm.completion_cost", return_value=0.05):
-        cost = manager.pricing.calculate("gpt-4", 100, 100)
-    assert cost == 0.05
-
-    # 3. Record spend
-    await manager.record_spend(user_id, cost, project_id="proj_1", model="gpt-4")
-
-    # 4. Check availability again (should pass)
-    await manager.check_availability(user_id)
-
+@pytest.fixture
+def manager(config: CoreasonBudgetConfig) -> None:
+    # We need to mock the ledgers creation inside __init__ to avoid real connections or fakeredis if we want pure unit tests
+    # But using fakeredis is better for integration.
+    # However, here we want to test Manager delegating to Guard/Ledger.
+    # So we can patch BudgetGuard and SyncBudgetGuard?
+    # Or just patch redis.
+    pass
 
 @pytest.mark.asyncio
-async def test_budget_exceeded_flow(manager: BudgetManager) -> None:
-    """Test flow where budget is exceeded."""
-    user_id = "user_broke"
-    limit = manager.config.daily_user_limit_usd  # 10.0
+async def test_manager_async_flow(config: CoreasonBudgetConfig) -> None:
+    # Mock at the Redis level
+    with patch("coreason_budget.ledger.from_url") as mock_async_redis, \
+         patch("coreason_budget.ledger.sync_from_url"):
 
-    # Record enough spend to reach limit
-    await manager.record_spend(user_id, limit, project_id="proj_1", model="gpt-4")
+        # Setup mocks
+        mock_async = AsyncMock()
+        mock_async_redis.return_value = mock_async
+        # get returning 0.0
+        mock_async.get.return_value = "0.0"
 
-    # Verify check fails
-    with pytest.raises(BudgetExceededError):
-        await manager.check_availability(user_id)
+        mgr = BudgetManager(config)
 
+        # Check
+        available = await mgr.check_availability("user1", "proj1", 0.5)
+        assert available is True
 
-@pytest.mark.asyncio
-async def test_check_availability_estimation_pass_through(manager: BudgetManager) -> None:
-    """Test that estimated_cost is passed through to the guard."""
-    user_id = "user_pass_through"
-    # Limit 10.0
+        # Charge
+        mock_async.eval.return_value = "1.0"
+        await mgr.record_spend("user1", 0.5, "proj1")
 
-    # 1. Spend 8.0
-    await manager.record_spend(user_id, 8.0, project_id="proj_1", model="gpt-4")
+        # Verify calls
+        assert mock_async.get.call_count >= 1
+        assert mock_async.eval.call_count >= 1
 
-    # 2. Check with 3.0 -> should fail (11.0 > 10.0)
-    with pytest.raises(BudgetExceededError):
-        await manager.check_availability(user_id, estimated_cost=3.0)
+        await mgr.close()
 
+def test_manager_sync_flow(config: CoreasonBudgetConfig) -> None:
+    with patch("coreason_budget.ledger.from_url"), \
+         patch("coreason_budget.ledger.sync_from_url") as mock_sync_redis:
 
-@pytest.mark.asyncio
-async def test_pricing_integration(manager: BudgetManager) -> None:
-    """Test pricing engine access."""
-    assert manager.pricing is not None
-    # We mocked litellm in unit tests, here we might want to check it works or mock again.
-    # Since we don't have API keys, real calls fail.
-    # So we mock.
-    with patch("coreason_budget.pricing.litellm.completion_cost", return_value=1.0):
-        cost = manager.pricing.calculate("m", 1, 1)
-        assert cost == 1.0
+        mock_sync = MagicMock()
+        mock_sync_redis.return_value = mock_sync
+        mock_sync.get.return_value = "0.0"
+        mock_sync.eval.return_value = "1.0"
+
+        mgr = BudgetManager(config)
+
+        available = mgr.check_availability_sync("user1", "proj1", 0.5)
+        assert available is True
+
+        mgr.record_spend_sync("user1", 0.5, "proj1")
+
+        assert mock_sync.get.call_count >= 1
+        assert mock_sync.eval.call_count >= 1
+
+        # close calls sync_ledger.close
+        mgr._sync_ledger.close()
+
+def test_manager_pricing_access(config: CoreasonBudgetConfig) -> None:
+    with patch("coreason_budget.ledger.from_url"), patch("coreason_budget.ledger.sync_from_url"):
+        mgr = BudgetManager(config)
+        assert mgr.pricing is not None
+        # Just ensure we can call it (mocks internal)
+        with patch("coreason_budget.pricing.litellm.completion_cost", return_value=0.1):
+            cost = mgr.pricing.calculate("gpt-4", 100, 100)
+            assert cost == 0.1

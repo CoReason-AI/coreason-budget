@@ -1,183 +1,159 @@
-# Copyright (c) 2025 CoReason, Inc.
-#
-# This software is proprietary and dual-licensed.
-# Licensed under the Prosperity Public License 3.0 (the "License").
-# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
-# For details, see the LICENSE file.
-# Commercial use beyond a 30-day trial requires a separate license.
-#
-# Source Code: https://github.com/CoReason-AI/coreason_budget
-
-import datetime
-from typing import List, Optional, Tuple
+from typing import Optional
+from datetime import datetime, timezone
 
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.ledger import RedisLedger, SyncRedisLedger
+from coreason_budget.exceptions import BudgetExceededError
 from coreason_budget.utils.logger import logger
 
 
-class BudgetExceededError(Exception):
-    """Raised when a budget limit is exceeded."""
-
-    pass
-
-
 class BaseBudgetGuard:
-    """Base class for BudgetGuard sharing common logic."""
+    """Base logic for BudgetGuard (Sync and Async)."""
 
-    def __init__(self, config: CoreasonBudgetConfig) -> None:
+    def __init__(self, config: CoreasonBudgetConfig):
         self.config = config
 
     def _get_date_str(self) -> str:
-        """Get current UTC date string (YYYY-MM-DD)."""
-        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+        """Get current date string (UTC) for key construction."""
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    def _get_ttl_seconds(self) -> int:
-        """Get seconds until next UTC midnight."""
-        now = datetime.datetime.now(datetime.timezone.utc)
-        # Calculate next midnight
-        midnight = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        seconds = int((midnight - now).total_seconds())
-        # Ensure minimum TTL of 1 second to prevent accidental key deletion
-        return max(1, seconds)
-
-    def _get_keys_and_limits(self, user_id: str, project_id: Optional[str] = None) -> List[Tuple[str, float, str]]:
-        """
-        Return list of (redis_key, limit_amount, scope_name).
-        Scope hierarchy: Global -> Project -> User.
-        """
+    def _get_keys(self, user_id: str, project_id: Optional[str] = None) -> dict[str, str]:
+        """Construct Redis keys for different scopes."""
         date_str = self._get_date_str()
-        items = []
-
-        # Global Limit
-        global_key = f"spend:v1:global:{date_str}"
-        items.append((global_key, self.config.daily_global_limit_usd, "Global"))
-
-        # Project Limit
+        keys = {
+            "global": f"budget:global:{date_str}",
+            "user": f"budget:user:{user_id}:{date_str}",
+        }
         if project_id:
-            project_key = f"spend:v1:project:{project_id}:{date_str}"
-            items.append((project_key, self.config.daily_project_limit_usd, f"Project {project_id}"))
+            keys["project"] = f"budget:project:{project_id}:{date_str}"
+        return keys
 
-        # User Limit
-        user_key = f"spend:v1:user:{user_id}:{date_str}"
-        items.append((user_key, self.config.daily_user_limit_usd, f"User {user_id}"))
-
-        return items
-
-    def _check_limit_and_log(self, scope: str, limit: float, used: float, estimated_cost: float) -> None:
-        """Validate usage against limit and log result."""
-        # Fail if budget is already exhausted (used >= limit)
-        # OR if this specific request would exceed the limit (used + est > limit)
-        if used >= limit or (estimated_cost > 0 and used + estimated_cost > limit):
-            logger.warning("Budget exceeded for {}: Used ${} + Est ${} > Limit ${}", scope, used, estimated_cost, limit)
-            raise BudgetExceededError(f"{scope} daily limit of ${limit} reached.")
-
-        # Log successful check for this scope (User scope is most relevant to log if we want per-user tracking)
-        if "User" in scope:
-            logger.info("Budget Check: {} | Used: ${} + Est: ${} / Limit: ${}", scope, used, estimated_cost, limit)
+    def _calculate_ttl(self) -> int:
+        """
+        Calculate seconds until next UTC midnight.
+        This ensures keys expire automatically.
+        """
+        now = datetime.now(timezone.utc)
+        # Midnight next day
+        midnight = (now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() + 86400)
+        current = now.timestamp()
+        return int(midnight - current)
 
 
 class BudgetGuard(BaseBudgetGuard):
-    """Enforces budget limits asynchronously."""
+    """Async Enforcer of budget limits."""
 
-    def __init__(self, config: CoreasonBudgetConfig, ledger: RedisLedger) -> None:
+    def __init__(self, config: CoreasonBudgetConfig, ledger: RedisLedger):
         super().__init__(config)
         self.ledger = ledger
 
-    async def check_availability(
-        self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0
-    ) -> None:
+    async def check(self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0) -> bool:
         """
-        Check if budget is available.
-        Raises BudgetExceededError if any limit is reached.
+        Check if the request allows for the estimated cost.
+        Raises BudgetExceededError if limit would be breached.
         """
-        checks = self._get_keys_and_limits(user_id, project_id)
+        keys = self._get_keys(user_id, project_id)
 
-        for key, limit, scope in checks:
-            used = await self.ledger.get_usage(key)
-            self._check_limit_and_log(scope, limit, used, estimated_cost)
+        # 1. Global Check
+        global_usage = await self.ledger.get_usage(keys["global"])
+        if global_usage + estimated_cost > self.config.daily_global_limit_usd:
+            logger.warning("Global budget exceeded. Used: ${}, Limit: ${}", global_usage, self.config.daily_global_limit_usd)
+            raise BudgetExceededError("Global daily limit exceeded")
 
-    async def record_spend(
-        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
-    ) -> None:
+        # 2. Project Check
+        if project_id and "project" in keys:
+            project_usage = await self.ledger.get_usage(keys["project"])
+            if project_usage + estimated_cost > self.config.daily_project_limit_usd:
+                logger.warning("Project budget exceeded. Project: {}, Used: ${}, Limit: ${}", project_id, project_usage, self.config.daily_project_limit_usd)
+                raise BudgetExceededError(f"Project daily limit exceeded for {project_id}")
+
+        # 3. User Check
+        user_usage = await self.ledger.get_usage(keys["user"])
+        if user_usage + estimated_cost > self.config.daily_user_limit_usd:
+            logger.warning("User budget exceeded. User: {}, Used: ${}, Limit: ${}", user_id, user_usage, self.config.daily_user_limit_usd)
+            raise BudgetExceededError(f"User daily limit exceeded for {user_id}")
+
+        logger.info("Budget Check Passed: User {} | Estimated Cost: ${}", user_id, estimated_cost)
+        return True
+
+    async def charge(self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None) -> None:
         """
-        Record spend against all applicable scopes.
-        Args:
-            user_id: The user ID.
-            amount: The amount to record.
-            project_id: Optional project identifier.
-            model: Optional model name (for metrics).
+        Record actual spend.
+        Updates counters for all scopes.
         """
-        keys_info = self._get_keys_and_limits(user_id, project_id)
-        ttl = self._get_ttl_seconds()
+        keys = self._get_keys(user_id, project_id)
+        ttl = self._calculate_ttl()
 
-        # We need to increment all keys.
-        for key, _, _ in keys_info:
-            await self.ledger.increment(key, amount, ttl=ttl)
+        for key in keys.values():
+             await self.ledger.increment(key, cost, ttl)
 
-        # Log metric event
-        # Format: finops.spend.total (Counter, tagged by Model and Project)
-        # We simulate a metric emission via structured logging
-        # If project_id or model are None, we log "unknown" or similar placeholder
-        safe_project_id = project_id if project_id else "unknown"
-        safe_model = model if model else "unknown"
+        # Observability
+        # Log: "Budget Check: User [ID] | Used: $[X] / Limit: $[Y]"
+        # Requirement says "Log: 'Budget Check...'" but here we are charging.
+        # Maybe the log should be "Transaction Cost: $X".
+        # The requirement "Observability" section says:
+        # "Log: 'Budget Check: User [ID] | Used: $[X] / Limit: $[Y]'"
+        # "Metric: finops.spend.total (Counter, tagged by Model and Project)"
+        # Since I don't have a metrics lib, I will log structured data that can be parsed.
 
         logger.info(
-            "METRIC: finops.spend.total | Amount: ${} | Tags: model={}, project={}, user={}",
-            amount,
-            safe_model,
-            safe_project_id,
-            user_id,
+            "Transaction Recorded",
+            extra={
+                "event": "finops.spend.total",
+                "user_id": user_id,
+                "project_id": project_id,
+                "model": model,
+                "cost_usd": cost
+            }
         )
+        # Also legacy human readable log as requested
+        logger.info("Recorded Spend: User {} | Cost: ${} | Project: {} | Model: {}", user_id, cost, project_id, model)
 
 
 class SyncBudgetGuard(BaseBudgetGuard):
-    """Enforces budget limits synchronously."""
+    """Synchronous Enforcer of budget limits."""
 
-    def __init__(self, config: CoreasonBudgetConfig, ledger: SyncRedisLedger) -> None:
+    def __init__(self, config: CoreasonBudgetConfig, ledger: SyncRedisLedger):
         super().__init__(config)
         self.ledger = ledger
 
-    def check_availability(self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0) -> None:
-        """
-        Check if budget is available.
-        Raises BudgetExceededError if any limit is reached.
-        """
-        checks = self._get_keys_and_limits(user_id, project_id)
+    def check(self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0) -> bool:
+        keys = self._get_keys(user_id, project_id)
 
-        for key, limit, scope in checks:
-            used = self.ledger.get_usage(key)
-            self._check_limit_and_log(scope, limit, used, estimated_cost)
+        global_usage = self.ledger.get_usage(keys["global"])
+        if global_usage + estimated_cost > self.config.daily_global_limit_usd:
+            logger.warning("Global budget exceeded. Used: ${}, Limit: ${}", global_usage, self.config.daily_global_limit_usd)
+            raise BudgetExceededError("Global daily limit exceeded")
 
-    def record_spend(
-        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
-    ) -> None:
-        """
-        Record spend against all applicable scopes.
-        Args:
-            user_id: The user ID.
-            amount: The amount to record.
-            project_id: Optional project identifier.
-            model: Optional model name (for metrics).
-        """
-        keys_info = self._get_keys_and_limits(user_id, project_id)
-        ttl = self._get_ttl_seconds()
+        if project_id and "project" in keys:
+            project_usage = self.ledger.get_usage(keys["project"])
+            if project_usage + estimated_cost > self.config.daily_project_limit_usd:
+                 logger.warning("Project budget exceeded. Project: {}, Used: ${}, Limit: ${}", project_id, project_usage, self.config.daily_project_limit_usd)
+                 raise BudgetExceededError(f"Project daily limit exceeded for {project_id}")
 
-        # We need to increment all keys.
-        for key, _, _ in keys_info:
-            self.ledger.increment(key, amount, ttl=ttl)
+        user_usage = self.ledger.get_usage(keys["user"])
+        if user_usage + estimated_cost > self.config.daily_user_limit_usd:
+            logger.warning("User budget exceeded. User: {}, Used: ${}, Limit: ${}", user_id, user_usage, self.config.daily_user_limit_usd)
+            raise BudgetExceededError(f"User daily limit exceeded for {user_id}")
 
-        # Log metric event
-        # Format: finops.spend.total (Counter, tagged by Model and Project)
-        # We simulate a metric emission via structured logging
-        # If project_id or model are None, we log "unknown" or similar placeholder
-        safe_project_id = project_id if project_id else "unknown"
-        safe_model = model if model else "unknown"
+        logger.info("Budget Check Passed: User {} | Estimated Cost: ${}", user_id, estimated_cost)
+        return True
+
+    def charge(self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None) -> None:
+        keys = self._get_keys(user_id, project_id)
+        ttl = self._calculate_ttl()
+
+        for key in keys.values():
+            self.ledger.increment(key, cost, ttl)
 
         logger.info(
-            "METRIC: finops.spend.total | Amount: ${} | Tags: model={}, project={}, user={}",
-            amount,
-            safe_model,
-            safe_project_id,
-            user_id,
+            "Transaction Recorded",
+            extra={
+                "event": "finops.spend.total",
+                "user_id": user_id,
+                "project_id": project_id,
+                "model": model,
+                "cost_usd": cost
+            }
         )
+        logger.info("Recorded Spend: User {} | Cost: ${} | Project: {} | Model: {}", user_id, cost, project_id, model)

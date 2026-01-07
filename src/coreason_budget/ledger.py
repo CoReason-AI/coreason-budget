@@ -13,9 +13,9 @@ from typing import Optional
 from redis import Redis as SyncRedis
 from redis import from_url as sync_from_url
 from redis.asyncio import Redis, from_url
-from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import RedisError
 
+from coreason_budget.exceptions import RedisConnectionError
 from coreason_budget.utils.logger import logger
 
 LUA_INCREMENT_SCRIPT = """
@@ -23,12 +23,6 @@ local current = redis.call("INCRBYFLOAT", KEYS[1], ARGV[1])
 if ARGV[2] ~= "nil" then
     local ttl = redis.call("TTL", KEYS[1])
     -- If key has no expiry (ttl == -1) or is new, set it.
-    -- Actually, if we pass a TTL, we usually mean "ensure this key expires in X seconds".
-    -- But for a daily budget, if we set it to 24h at 10AM, and then update at 11AM,
-    -- we don't want to reset it to 24h. We want to keep the original expiry.
-    -- Ideally the caller provides the remaining seconds to midnight.
-    -- If the key already exists, its TTL is ticking.
-    -- So we only set EXPIRE if TTL is -1 (no expiry) or if the key was just created.
     if ttl == -1 then
         redis.call("EXPIRE", KEYS[1], ARGV[2])
     end
@@ -42,8 +36,6 @@ class RedisLedger:
 
     def __init__(self, redis_url: str) -> None:
         self.redis_url = redis_url
-        # redis-py handles connection pooling automatically.
-        # We initialize it here but it connects lazily.
         self._redis: Redis = from_url(self.redis_url, encoding="utf-8", decode_responses=True)
 
     async def connect(self) -> None:
@@ -54,7 +46,7 @@ class RedisLedger:
         try:
             await self._redis.ping()
             logger.info("Connected to Redis at {}", self.redis_url)
-        except RedisError as e:
+        except Exception as e:
             logger.error("Failed to connect to Redis: {}", e)
             raise RedisConnectionError(f"Could not connect to Redis: {e}") from e
 
@@ -75,15 +67,9 @@ class RedisLedger:
     async def increment(self, key: str, amount: float, ttl: Optional[int] = None) -> float:
         """
         Atomically increment a key by amount.
-        If ttl is provided and key is new (or has no expiry?), set expiry.
-
-        For daily limits, we typically want to set expiry on first creation.
-        If the key exists, we just increment.
-
         Returns the new value.
         """
         try:
-            # Redis Lua arguments are strings
             ttl_arg = str(ttl) if ttl is not None else "nil"
             result = await self._redis.eval(LUA_INCREMENT_SCRIPT, 1, key, str(amount), ttl_arg)
             return float(result)
@@ -107,7 +93,7 @@ class SyncRedisLedger:
         try:
             self._redis.ping()
             logger.info("Connected to Redis at {}", self.redis_url)
-        except RedisError as e:
+        except Exception as e:
             logger.error("Failed to connect to Redis: {}", e)
             raise RedisConnectionError(f"Could not connect to Redis: {e}") from e
 
