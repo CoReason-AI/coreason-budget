@@ -1,13 +1,3 @@
-# Copyright (c) 2025 CoReason, Inc.
-#
-# This software is proprietary and dual-licensed.
-# Licensed under the Prosperity Public License 3.0 (the "License").
-# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
-# For details, see the LICENSE file.
-# Commercial use beyond a 30-day trial requires a separate license.
-#
-# Source Code: https://github.com/CoReason-AI/coreason_budget
-
 from typing import Optional
 
 from coreason_budget.config import CoreasonBudgetConfig
@@ -19,95 +9,63 @@ from coreason_budget.validation import validate_check_availability_inputs, valid
 
 class BudgetManager:
     """
-    Main entry point for Coreason Budget.
-    Orchestrates BudgetGuard, RedisLedger, and PricingEngine.
+    Main interface for the Budget system.
+    Supports both Async and Sync workflows via separate methods for check/charge,
+    but primarily designed for async integration.
     """
 
-    def __init__(self, config: CoreasonBudgetConfig) -> None:
+    def __init__(self, config: CoreasonBudgetConfig):
         self.config = config
-        self.ledger = RedisLedger(config.redis_url)
+
+        # Async Components
+        self._async_ledger = RedisLedger(config.redis_url)
+        self.guard = BudgetGuard(config, self._async_ledger)
+
+        # Sync Components
+        self._sync_ledger = SyncRedisLedger(config.redis_url)
+        self.sync_guard = SyncBudgetGuard(config, self._sync_ledger)
+
         self.pricing = PricingEngine(config)
-        self.guard = BudgetGuard(config, self.ledger)
 
     async def check_availability(
         self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0
-    ) -> None:
+    ) -> bool:
         """
-        Pre-flight check: Verify if budget allows the request.
-        Raises BudgetExceededError if limit reached.
-
-        Args:
-            user_id: The unique identifier for the user.
-            project_id: Optional project identifier. Required for checking project-level quotas.
-            estimated_cost: Optional estimated cost of the request.
+        Check budget availability asynchronously.
         """
         validate_check_availability_inputs(user_id)
+        return await self.guard.check(user_id, project_id, estimated_cost)
 
-        await self.guard.check_availability(user_id, project_id, estimated_cost=estimated_cost)
+    def check_availability_sync(
+        self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0
+    ) -> bool:
+        """
+        Check budget availability synchronously.
+        """
+        validate_check_availability_inputs(user_id)
+        return self.sync_guard.check(user_id, project_id, estimated_cost)
 
     async def record_spend(
-        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
+        self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
     ) -> None:
         """
-        Post-flight charge: Record the actual spend.
-
-        Args:
-            user_id: The unique identifier for the user.
-            amount: The actual cost in USD to record.
-            project_id: Optional project identifier.
-            model: Optional model name.
+        Record spend asynchronously.
         """
-        validate_record_spend_inputs(user_id, amount, project_id, model)
+        validate_record_spend_inputs(user_id, cost, project_id, model)
+        await self.guard.charge(user_id, cost, project_id, model)
 
-        await self.guard.record_spend(user_id, amount, project_id, model=model)
+    def record_spend_sync(
+        self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
+    ) -> None:
+        """
+        Record spend synchronously.
+        """
+        validate_record_spend_inputs(user_id, cost, project_id, model)
+        self.sync_guard.charge(user_id, cost, project_id, model)
 
     async def close(self) -> None:
-        """Cleanup resources (Redis connection)."""
-        await self.ledger.close()
-
-
-class SyncBudgetManager:
-    """
-    Main entry point for Coreason Budget (Synchronous).
-    Orchestrates SyncBudgetGuard, SyncRedisLedger, and PricingEngine.
-    """
-
-    def __init__(self, config: CoreasonBudgetConfig) -> None:
-        self.config = config
-        self.ledger = SyncRedisLedger(config.redis_url)
-        self.pricing = PricingEngine(config)
-        self.guard = SyncBudgetGuard(config, self.ledger)
-
-    def check_availability(self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0) -> None:
         """
-        Pre-flight check: Verify if budget allows the request.
-        Raises BudgetExceededError if limit reached.
-
-        Args:
-            user_id: The unique identifier for the user.
-            project_id: Optional project identifier. Required for checking project-level quotas.
-            estimated_cost: Optional estimated cost of the request.
+        Cleanup resources.
         """
-        validate_check_availability_inputs(user_id)
-
-        self.guard.check_availability(user_id, project_id, estimated_cost=estimated_cost)
-
-    def record_spend(
-        self, user_id: str, amount: float, project_id: Optional[str] = None, model: Optional[str] = None
-    ) -> None:
-        """
-        Post-flight charge: Record the actual spend.
-
-        Args:
-            user_id: The unique identifier for the user.
-            amount: The actual cost in USD to record.
-            project_id: Optional project identifier.
-            model: Optional model name.
-        """
-        validate_record_spend_inputs(user_id, amount, project_id, model)
-
-        self.guard.record_spend(user_id, amount, project_id, model=model)
-
-    def close(self) -> None:
-        """Cleanup resources (Redis connection)."""
-        self.ledger.close()
+        await self._async_ledger.close()
+        self._sync_ledger.close()

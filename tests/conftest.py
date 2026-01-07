@@ -22,7 +22,9 @@ async def manager() -> AsyncGenerator[BudgetManager, None]:
     mgr = BudgetManager(config)
 
     # Let's manually inject a fake redis client into the ledger
-    mgr.ledger._redis = aioredis.FakeRedis(decode_responses=True)
+    # Updated: BudgetManager no longer exposes .ledger directly, it has ._async_ledger
+    # And ._async_ledger._redis
+    mgr._async_ledger._redis = aioredis.FakeRedis(decode_responses=True)
 
     yield mgr
     await mgr.close()

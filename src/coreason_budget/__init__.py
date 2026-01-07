@@ -13,18 +13,15 @@
 This package provides financial guardrails and budget enforcement for LLM usage.
 """
 
-from redis.exceptions import ConnectionError as RedisConnectionError
-
 from coreason_budget.config import CoreasonBudgetConfig
-from coreason_budget.guard import BudgetExceededError
-from coreason_budget.manager import BudgetManager, SyncBudgetManager
+from coreason_budget.exceptions import BudgetExceededError, RedisConnectionError
+from coreason_budget.manager import BudgetManager
 
 # Alias for convenience/compatibility with intended usage
 BudgetConfig = CoreasonBudgetConfig
 
 __all__ = [
     "BudgetManager",
-    "SyncBudgetManager",
     "BudgetConfig",
     "CoreasonBudgetConfig",
     "BudgetExceededError",
