@@ -8,14 +8,22 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_budget
 
+"""Coreason Budget Package.
+
+This package provides financial guardrails and budget enforcement for LLM usage.
 """
-enforces budget
-"""
 
-__version__ = "0.1.0"
-__author__ = "Gowtham A Rao"
-__email__ = "gowtham.rao@coreason.ai"
+from coreason_budget.config import CoreasonBudgetConfig
+from coreason_budget.exceptions import BudgetExceededError, RedisConnectionError
+from coreason_budget.manager import BudgetManager
 
-from .main import hello_world
+# Alias for convenience/compatibility with intended usage
+BudgetConfig = CoreasonBudgetConfig
 
-__all__ = ["hello_world"]
+__all__ = [
+    "BudgetManager",
+    "BudgetConfig",
+    "CoreasonBudgetConfig",
+    "BudgetExceededError",
+    "RedisConnectionError",
+]
