@@ -1,5 +1,6 @@
 from typing import Optional
 
+from coreason_identity.models import UserContext
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.guard import BudgetGuard, SyncBudgetGuard
 from coreason_budget.ledger import RedisLedger, SyncRedisLedger
@@ -28,40 +29,40 @@ class BudgetManager:
         self.pricing = PricingEngine(config)
 
     async def check_availability(
-        self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0
+        self, user_context: UserContext, project_id: Optional[str] = None, estimated_cost: float = 0.0
     ) -> bool:
         """
         Check budget availability asynchronously.
         """
-        validate_check_availability_inputs(user_id)
-        return await self.guard.check(user_id, project_id, estimated_cost)
+        validate_check_availability_inputs(user_context.user_id)
+        return await self.guard.check(user_context, project_id, estimated_cost)
 
     def check_availability_sync(
-        self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0
+        self, user_context: UserContext, project_id: Optional[str] = None, estimated_cost: float = 0.0
     ) -> bool:
         """
         Check budget availability synchronously.
         """
-        validate_check_availability_inputs(user_id)
-        return self.sync_guard.check(user_id, project_id, estimated_cost)
+        validate_check_availability_inputs(user_context.user_id)
+        return self.sync_guard.check(user_context, project_id, estimated_cost)
 
     async def record_spend(
-        self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
+        self, user_context: UserContext, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
     ) -> None:
         """
         Record spend asynchronously.
         """
-        validate_record_spend_inputs(user_id, cost, project_id, model)
-        await self.guard.charge(user_id, cost, project_id, model)
+        validate_record_spend_inputs(user_context.user_id, cost, project_id, model)
+        await self.guard.charge(user_context, cost, project_id, model)
 
     def record_spend_sync(
-        self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
+        self, user_context: UserContext, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
     ) -> None:
         """
         Record spend synchronously.
         """
-        validate_record_spend_inputs(user_id, cost, project_id, model)
-        self.sync_guard.charge(user_id, cost, project_id, model)
+        validate_record_spend_inputs(user_context.user_id, cost, project_id, model)
+        self.sync_guard.charge(user_context, cost, project_id, model)
 
     async def close(self) -> None:
         """

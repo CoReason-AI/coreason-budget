@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request, Header
 from pydantic import BaseModel
 from redis.exceptions import RedisError
 
+from coreason_identity.models import UserContext
 from coreason_budget.config import BudgetConfig
 from coreason_budget.exceptions import BudgetExceededError
 from coreason_budget.manager import BudgetManager
@@ -12,16 +13,32 @@ from coreason_budget.utils.logger import logger
 
 
 class CheckBudgetRequest(BaseModel):  # type: ignore[misc]
-    user_id: str
+    user_id: Optional[str] = None
     project_id: Optional[str] = None
     estimated_cost: float = 0.0
 
 
 class RecordSpendRequest(BaseModel):  # type: ignore[misc]
-    user_id: str
+    user_id: Optional[str] = None
     cost: float
     project_id: Optional[str] = None
     model: Optional[str] = None
+
+
+async def get_user_context(
+    request: Request, x_user_context: Optional[str] = Header(None, alias="X-User-Context")
+) -> UserContext:
+    if hasattr(request.state, "user_context") and isinstance(request.state.user_context, UserContext):
+        return request.state.user_context
+
+    if x_user_context:
+        try:
+            return UserContext.model_validate_json(x_user_context)
+        except Exception as e:
+            logger.error("Failed to parse X-User-Context: {}", e)
+            raise HTTPException(status_code=401, detail="Invalid User Context")
+
+    raise HTTPException(status_code=401, detail="Missing User Context")
 
 
 @asynccontextmanager
@@ -45,11 +62,13 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/check")
-async def check_budget(request: CheckBudgetRequest) -> Dict[str, str]:
+async def check_budget(
+    request: CheckBudgetRequest, user_context: UserContext = Depends(get_user_context)
+) -> Dict[str, str]:
     budget: BudgetManager = app.state.budget
     try:
         await budget.check_availability(
-            user_id=request.user_id,
+            user_context=user_context,
             project_id=request.project_id,
             estimated_cost=request.estimated_cost,
         )
@@ -62,11 +81,13 @@ async def check_budget(request: CheckBudgetRequest) -> Dict[str, str]:
 
 
 @app.post("/spend")
-async def record_spend(request: RecordSpendRequest) -> Dict[str, str]:
+async def record_spend(
+    request: RecordSpendRequest, user_context: UserContext = Depends(get_user_context)
+) -> Dict[str, str]:
     budget: BudgetManager = app.state.budget
     try:
         await budget.record_spend(
-            user_id=request.user_id,
+            user_context=user_context,
             cost=request.cost,
             project_id=request.project_id,
             model=request.model,
