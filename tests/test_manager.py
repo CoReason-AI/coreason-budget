@@ -1,8 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from coreason_identity.models import UserContext
+
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.manager import BudgetManager
 
@@ -11,15 +11,10 @@ from coreason_budget.manager import BudgetManager
 def config() -> CoreasonBudgetConfig:
     return CoreasonBudgetConfig(redis_url="redis://localhost")
 
+
 @pytest.fixture
 def user_context() -> UserContext:
-    return UserContext(
-        user_id="user1",
-        email="user1@example.com",
-        groups=[],
-        scopes=[],
-        claims={}
-    )
+    return UserContext(user_id="user1", email="user1@example.com", groups=[], scopes=[], claims={})
 
 
 @pytest.mark.asyncio

@@ -2,10 +2,10 @@ from unittest.mock import patch
 
 import fakeredis.aioredis
 import pytest
+from coreason_identity.models import UserContext
 from redis.exceptions import ConnectionError as RedisPyConnectionError
 from redis.exceptions import RedisError
 
-from coreason_identity.models import UserContext
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.exceptions import BudgetExceededError
 from coreason_budget.manager import BudgetManager
@@ -19,14 +19,9 @@ def config() -> CoreasonBudgetConfig:
         daily_user_limit_usd=1000.0,
     )
 
+
 def create_context(user_id: str) -> UserContext:
-    return UserContext(
-        user_id=user_id,
-        email="test@example.com",
-        groups=[],
-        scopes=[],
-        claims={}
-    )
+    return UserContext(user_id=user_id, email="test@example.com", groups=[], scopes=[], claims={})
 
 
 @pytest.mark.asyncio
@@ -93,8 +88,6 @@ async def test_redis_downtime_during_charge(config: CoreasonBudgetConfig) -> Non
         context = create_context(user_id)
 
         with patch.object(mgr._async_ledger._redis, "eval", side_effect=RedisPyConnectionError("Connection lost")):
-            from redis.exceptions import RedisError
-
             with pytest.raises(RedisError):
                 await mgr.record_spend(context, 10.0)
 

@@ -1,8 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from coreason_identity.models import UserContext
+
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.exceptions import BudgetExceededError
 from coreason_budget.guard import BudgetGuard, SyncBudgetGuard
@@ -18,15 +18,10 @@ def config() -> CoreasonBudgetConfig:
         daily_user_limit_usd=10.0,
     )
 
+
 @pytest.fixture
 def user_context() -> UserContext:
-    return UserContext(
-        user_id="user1",
-        email="user1@example.com",
-        groups=[],
-        scopes=[],
-        claims={}
-    )
+    return UserContext(user_id="user1", email="user1@example.com", groups=[], scopes=[], claims={})
 
 
 @pytest.mark.asyncio
@@ -100,7 +95,7 @@ async def test_guard_charge(config: CoreasonBudgetConfig, user_context: UserCont
     call_args = ledger.increment.call_args
     # call_args is (args, kwargs)
     # increment(key, amount, owner_id=..., ttl=...)
-    assert call_args.kwargs['owner_id'] == "user1"
+    assert call_args.kwargs["owner_id"] == "user1"
 
 
 def test_sync_guard_check_success(config: CoreasonBudgetConfig, user_context: UserContext) -> None:
@@ -149,4 +144,4 @@ def test_sync_guard_charge(config: CoreasonBudgetConfig, user_context: UserConte
     guard.charge(user_context, 5.0, "proj1")
 
     assert ledger.increment.call_count == 3
-    assert ledger.increment.call_args.kwargs['owner_id'] == "user1"
+    assert ledger.increment.call_args.kwargs["owner_id"] == "user1"

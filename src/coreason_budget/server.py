@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Depends, Request, Header
+from coreason_identity.models import UserContext
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel
 from redis.exceptions import RedisError
 
-from coreason_identity.models import UserContext
 from coreason_budget.config import BudgetConfig
 from coreason_budget.exceptions import BudgetExceededError
 from coreason_budget.manager import BudgetManager
@@ -36,7 +36,7 @@ async def get_user_context(
             return UserContext.model_validate_json(x_user_context)
         except Exception as e:
             logger.error("Failed to parse X-User-Context: {}", e)
-            raise HTTPException(status_code=401, detail="Invalid User Context")
+            raise HTTPException(status_code=401, detail="Invalid User Context") from e
 
     raise HTTPException(status_code=401, detail="Missing User Context")
 

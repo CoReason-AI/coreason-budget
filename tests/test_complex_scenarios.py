@@ -1,11 +1,11 @@
 import asyncio
+from datetime import datetime
 from unittest.mock import patch
 
 import fakeredis.aioredis
 import pytest
-from datetime import datetime
-
 from coreason_identity.models import UserContext
+
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.exceptions import BudgetExceededError
 from coreason_budget.manager import BudgetManager
@@ -17,14 +17,9 @@ def config() -> CoreasonBudgetConfig:
         redis_url="redis://localhost", daily_user_limit_usd=100.0, daily_global_limit_usd=1000.0
     )
 
+
 def create_context(user_id: str) -> UserContext:
-    return UserContext(
-        user_id=user_id,
-        email=f"{user_id}@example.com",
-        groups=[],
-        scopes=[],
-        claims={}
-    )
+    return UserContext(user_id=user_id, email=f"{user_id}@example.com", groups=[], scopes=[], claims={})
 
 
 @pytest.mark.asyncio
