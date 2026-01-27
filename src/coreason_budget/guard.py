@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Optional
 
+from coreason_identity.models import UserContext
+
 from coreason_budget.config import CoreasonBudgetConfig
 from coreason_budget.exceptions import BudgetExceededError
 from coreason_budget.ledger import RedisLedger, SyncRedisLedger
@@ -47,11 +49,14 @@ class BudgetGuard(BaseBudgetGuard):
         super().__init__(config)
         self.ledger = ledger
 
-    async def check(self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0) -> bool:
+    async def check(
+        self, user_context: UserContext, project_id: Optional[str] = None, estimated_cost: float = 0.0
+    ) -> bool:
         """
         Check if the request allows for the estimated cost.
         Raises BudgetExceededError if limit would be breached.
         """
+        user_id = user_context.user_id
         keys = self._get_keys(user_id, project_id)
 
         # 1. Global Check
@@ -96,17 +101,18 @@ class BudgetGuard(BaseBudgetGuard):
         return True
 
     async def charge(
-        self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
+        self, user_context: UserContext, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
     ) -> None:
         """
         Record actual spend.
         Updates counters for all scopes.
         """
+        user_id = user_context.user_id
         keys = self._get_keys(user_id, project_id)
         ttl = self._calculate_ttl()
 
         for key in keys.values():
-            await self.ledger.increment(key, cost, ttl)
+            await self.ledger.increment(key, cost, owner_id=user_id, ttl=ttl)
 
         # Observability
         logger.info(
@@ -129,7 +135,8 @@ class SyncBudgetGuard(BaseBudgetGuard):
         super().__init__(config)
         self.ledger = ledger
 
-    def check(self, user_id: str, project_id: Optional[str] = None, estimated_cost: float = 0.0) -> bool:
+    def check(self, user_context: UserContext, project_id: Optional[str] = None, estimated_cost: float = 0.0) -> bool:
+        user_id = user_context.user_id
         keys = self._get_keys(user_id, project_id)
 
         global_usage = self.ledger.get_usage(keys["global"])
@@ -169,12 +176,15 @@ class SyncBudgetGuard(BaseBudgetGuard):
         )
         return True
 
-    def charge(self, user_id: str, cost: float, project_id: Optional[str] = None, model: Optional[str] = None) -> None:
+    def charge(
+        self, user_context: UserContext, cost: float, project_id: Optional[str] = None, model: Optional[str] = None
+    ) -> None:
+        user_id = user_context.user_id
         keys = self._get_keys(user_id, project_id)
         ttl = self._calculate_ttl()
 
         for key in keys.values():
-            self.ledger.increment(key, cost, ttl)
+            self.ledger.increment(key, cost, owner_id=user_id, ttl=ttl)
 
         logger.info(
             "Transaction Recorded",
