@@ -64,7 +64,7 @@ class RedisLedger:
             logger.error("Redis GET error for key {}: {}", key, e)
             raise
 
-    async def increment(self, key: str, amount: float, ttl: Optional[int] = None) -> float:
+    async def increment(self, key: str, amount: float, owner_id: str, ttl: Optional[int] = None) -> float:
         """
         Atomically increment a key by amount.
         Returns the new value.
@@ -74,7 +74,7 @@ class RedisLedger:
             result = await self._redis.eval(LUA_INCREMENT_SCRIPT, 1, key, str(amount), ttl_arg)
             return float(result)
         except RedisError as e:
-            logger.error("Redis INCRBYFLOAT error for key {}: {}", key, e)
+            logger.error("Redis INCRBYFLOAT error for key {} (owner: {}): {}", key, owner_id, e)
             raise
 
 
@@ -111,7 +111,7 @@ class SyncRedisLedger:
             logger.error("Redis GET error for key {}: {}", key, e)
             raise
 
-    def increment(self, key: str, amount: float, ttl: Optional[int] = None) -> float:
+    def increment(self, key: str, amount: float, owner_id: str, ttl: Optional[int] = None) -> float:
         """
         Atomically increment a key by amount.
         Returns the new value.
@@ -121,5 +121,5 @@ class SyncRedisLedger:
             result = self._redis.eval(LUA_INCREMENT_SCRIPT, 1, key, str(amount), ttl_arg)
             return float(result)
         except RedisError as e:
-            logger.error("Redis INCRBYFLOAT error for key {}: {}", key, e)
+            logger.error("Redis INCRBYFLOAT error for key {} (owner: {}): {}", key, owner_id, e)
             raise
