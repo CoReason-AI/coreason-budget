@@ -104,6 +104,13 @@ def test_validation_error_logic(client: TestClient) -> None:
     assert "user_id" in response.json()["detail"]
 
 
+def test_record_spend_validation_error(client: TestClient, valid_context_header: dict[str, str]) -> None:
+    # Use empty project_id to trigger ValueError in validate_record_spend_inputs
+    response = client.post("/spend", json={"cost": 5.0, "project_id": "  "}, headers=valid_context_header)
+    assert response.status_code == 400
+    assert "project_id" in response.json()["detail"]
+
+
 def test_health_check_failure(client: TestClient) -> None:
     budget = app.state.budget
     original_ping = budget._async_ledger._redis.ping
