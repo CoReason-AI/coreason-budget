@@ -63,7 +63,8 @@ app = FastAPI(lifespan=lifespan)
 
 @app.post("/check")
 async def check_budget(
-    request: CheckBudgetRequest, user_context: UserContext = Depends(get_user_context)
+    request: CheckBudgetRequest,
+    user_context: UserContext = Depends(get_user_context),  # noqa: B008
 ) -> Dict[str, str]:
     budget: BudgetManager = app.state.budget
     try:
@@ -82,7 +83,8 @@ async def check_budget(
 
 @app.post("/spend")
 async def record_spend(
-    request: RecordSpendRequest, user_context: UserContext = Depends(get_user_context)
+    request: RecordSpendRequest,
+    user_context: UserContext = Depends(get_user_context),  # noqa: B008
 ) -> Dict[str, str]:
     budget: BudgetManager = app.state.budget
     try:
